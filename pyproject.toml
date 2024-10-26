@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polyllm"
+version = "0.0.1"
+authors = [
+    { name="Rory Butler" },
+]
+description = "A unified interface for querying multiple large language models"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "backoff>=2.2.1",
+    "pydantic>=2.9.2",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/RoryMB/polyllm"
+"Bug Tracker" = "https://github.com/RoryMB/polyllm/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
