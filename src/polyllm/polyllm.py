@@ -24,7 +24,11 @@ except ImportError:
     llamapython_import = False
     Llama = None
 
-import ollama
+try:
+    import ollama
+    ollama_import = True
+except ImportError:
+    ollama_import = False
 
 try:
     from openai import OpenAI
@@ -39,6 +43,7 @@ try:
     google_import = True
 except ImportError:
     google_import = False
+    GoogleResourceExhausted = None
 
 try:
     import anthropic
@@ -109,7 +114,7 @@ if not all((llamapython_import, openai_import, google_import, anthropic_import))
         missing.append('google-generativeai')
     if not anthropic_import:
         missing.append('anthropic')
-    MODEL_ERR_MSG += ". Failed imports: pip install " + " ".join(missing) + "."
+    MODEL_ERR_MSG += " Failed imports: pip install " + " ".join(missing) + " ."
 if any((openai_import and (openai_key is False), google_import and (google_key is False), anthropic_import and (anthropic_key is False))):
     missing = []
     if openai_import and (openai_key is False):
@@ -118,7 +123,7 @@ if any((openai_import and (openai_key is False), google_import and (google_key i
         missing.append('GOOGLE_API_KEY')
     if anthropic_import and (anthropic_key is False):
         missing.append('ANTHROPIC_API_KEY')
-    MODEL_ERR_MSG += ". Missing API keys: " + ", ".join(missing) + "."
+    MODEL_ERR_MSG += " Missing API keys: " + ", ".join(missing) + " ."
 
 
 def generate(

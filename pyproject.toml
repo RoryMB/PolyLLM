@@ -23,6 +23,15 @@ dependencies = [
     "pydantic>=2.9.2",
 ]
 
+[project.optional-dependencies]
+all = [
+    "llama_cpp_python>=0.3.1",
+    "ollama>=0.3.3",
+    "openai>=1.47.0",
+    "google-generativeai>=0.5.4",
+    "anthropic>=0.34.2",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/RoryMB/polyllm"
 "Bug Tracker" = "https://github.com/RoryMB/polyllm/issues"

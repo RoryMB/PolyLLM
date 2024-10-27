@@ -2,7 +2,7 @@ import os
 import textwrap
 import argparse
 import sys
-import polyllm
+from . import polyllm
 from pydantic import BaseModel, Field
 
 
@@ -38,6 +38,26 @@ GOOGLE_MODEL = args.google_model or ''
 ANTHROPIC_MODEL = args.anthropic_model or ''
 
 image_exists = os.path.isfile(IMAGE_PATH)
+
+if not polyllm.llamapython_import:
+    print(red("Import for `llama_cpp_python` failed. Run `pip install -U polyllm[all]` or `pip install llama_cpp_python`"))
+    LLAMA_PYTHON_MODEL = ''
+    LLAMA_PYTHON_SERVER_PORT = ''
+# if not polyllm.ollama_import:
+#     print(red("Import for `ollama` failed. Run `pip install -U polyllm[all]` or `pip install ollama`"))
+#     OLLAMA_MODEL = '' # ALSO FIX THE ` OLLAMA_MODEL = ''` BELOW!!!!!!
+if not polyllm.openai_import:
+    print(red("Import for `openai` failed. Run `pip install -U polyllm[all]` or `pip install openai`"))
+    OPENAI_MODEL = ''
+    OLLAMA_MODEL = ''
+if not polyllm.google_import:
+    print(red("Import for `google-generativeai` failed. Run `pip install -U polyllm[all]` or `pip install google-generativeai`"))
+    GOOGLE_MODEL = ''
+if not polyllm.anthropic_import:
+    print(red("Import for `anthropic` failed. Run `pip install -U polyllm[all]` or `pip install anthropic`"))
+    ANTHROPIC_MODEL = ''
+
+print()
 
 if not image_exists:
     print(red("The image file was not specified or does not exist. Multi-modal tests will be skipped."))

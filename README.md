@@ -27,10 +27,14 @@ Links:
 pip install polyllm
 ```
 
+```bash
+pip install polyllm[all] # Get all llamacpp, ollama, openai, google, anthropic packages
+```
+
 ## Demo
 
 ```bash
-python demo.py \
+python -m polyllm.demo \
     --image-path /path/to/image.jpg \
     --llama-python-model /path/to/model.gguf \
     --llama-python-server-port 8000 \
