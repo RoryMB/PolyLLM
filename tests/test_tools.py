@@ -1,5 +1,5 @@
 import pytest
-from polyllm import polyllm
+import polyllm
 
 def multiply(x: int, y: int) -> int:
     """Multiply two numbers"""
@@ -13,18 +13,18 @@ def test_tool_usage(models):
             "content": "What is 7 times 6?"
         }
     ]
-    
+
     for model in models:
         response, tool, args = polyllm.generate_tools(
             model,
             messages,
             tools=[multiply]
         )
-        
+
         # Should use the multiply tool
         assert tool == "multiply"
         assert args == {"x": 7, "y": 6}
-        
+
 def test_tool_usage_no_tool_needed(models):
     """Test model responds directly when no tool is needed"""
     messages = [
@@ -33,14 +33,14 @@ def test_tool_usage_no_tool_needed(models):
             "content": "Say hello!"
         }
     ]
-    
+
     for model in models:
         response, tool, args = polyllm.generate_tools(
             model,
             messages,
             tools=[multiply]
         )
-        
+
         # Should not use any tool
         assert tool == ""
         assert args == {}

@@ -1,5 +1,5 @@
 import pytest
-from polyllm import polyllm
+import polyllm
 
 def test_text_generation(models):
     """Test basic text generation across all models"""
@@ -7,7 +7,7 @@ def test_text_generation(models):
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Say hello!"},
     ]
-    
+
     for model in models:
         response = polyllm.generate(model, messages)
         assert isinstance(response, str)
