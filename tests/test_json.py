@@ -1,23 +1,34 @@
-import pytest
 import json
-import polyllm
+import textwrap
+from polyllm import polyllm
 
-def test_json_output(models):
+def test_json(model):
     """Test JSON output mode across all models"""
     messages = [
         {
             "role": "user",
-            "content": "List three colors in JSON format with 'colors' as the key"
-        }
+            "content": textwrap.dedent("""
+                Find the name of the first president of the USA and get the years that he served.
+                Produce the result in JSON that matches this schema:
+                    {
+                        "first_name": "first name",
+                        "last_name":  "last name",
+                        "years_served": "years served"
+                    }
+            """).strip(),
+        },
     ]
 
-    for model in models:
-        response = polyllm.generate(model, messages, json_object=True)
+    correct = {
+        "first_name": "George",
+        "last_name": "Washington",
+        "years_served": "1789-1797",
+    }
 
-        # Verify it's valid JSON
-        data = json.loads(response)
-        assert isinstance(data, dict)
-        assert "colors" in data
-        assert isinstance(data["colors"], list)
-        assert len(data["colors"]) == 3
-        assert all(isinstance(c, str) for c in data["colors"])
+    response = polyllm.generate(model, messages, json_object=True)
+    assert isinstance(response, str)
+    assert len(response) > 0
+
+    data = json.loads(response)
+    assert isinstance(data, dict)
+    assert data == correct

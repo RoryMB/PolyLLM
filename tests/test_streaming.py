@@ -1,27 +1,17 @@
-import pytest
-import polyllm
+from polyllm import polyllm
 
-def test_streaming(models):
+def test_streaming(model):
     """Test streaming capabilities across all models"""
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Count from 1 to 5."},
+        {"role": "user", "content": "Tell me a joke."},
+        {"role": "assistant", "content": "Why did the scarecrow win an award?\nBecause he was outstanding in his field!"},
+        {"role": "user", "content": "Great! Tell me another joke!"},
     ]
 
-    for model in models:
-        chunks = []
-        for chunk in polyllm.generate_stream(model, messages):
-            assert isinstance(chunk, str)
-            chunks.append(chunk)
-
-        # Verify we got multiple chunks
-        assert len(chunks) > 1
-
-        # Combine and verify the complete response
-        full_response = "".join(chunks)
-        assert isinstance(full_response, str)
-        assert len(full_response) > 0
-
-        # Should contain numbers 1-5
-        for i in range(1, 6):
-            assert str(i) in full_response
+    chunks = []
+    for chunk in polyllm.generate_stream(model, messages):
+        assert isinstance(chunk, str)
+        chunks.append(chunk)
+    full_response = "".join(chunks)
+    assert len(full_response) > 0

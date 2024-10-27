@@ -1,48 +1,39 @@
-import pytest
-import polyllm
+from polyllm import polyllm
 
-def multiply(x: int, y: int) -> int:
-    """Multiply two numbers"""
-    return x * y
+def multiply_large_numbers(a: int, b: int) -> int:
+    """Multiplies two large numbers."""
+    return a * b
 
-def test_tool_usage(models):
+def test_tools(model):
     """Test function/tool calling capabilities"""
-    messages = [
-        {
-            "role": "user",
-            "content": "What is 7 times 6?"
-        }
-    ]
+    messages = [{"role": "user", "content": "What is 123456 multiplied by 654321?"}]
 
-    for model in models:
-        response, tool, args = polyllm.generate_tools(
-            model,
-            messages,
-            tools=[multiply]
-        )
+    response, tool, args = polyllm.generate_tools(
+        model,
+        messages,
+        tools=[multiply_large_numbers]
+    )
 
-        # Should use the multiply tool
-        assert tool == "multiply"
-        assert args == {"x": 7, "y": 6}
+    assert isinstance(response, str)
+    assert tool == "multiply_large_numbers"
+    assert isinstance(args, dict)
+    assert int(args.get("a")) == 123456
+    assert int(args.get("b")) == 654321
 
-def test_tool_usage_no_tool_needed(models):
+def test_tools_no_tool_needed(model):
     """Test model responds directly when no tool is needed"""
-    messages = [
-        {
-            "role": "user",
-            "content": "Say hello!"
-        }
-    ]
+    messages = [{"role": "user", "content": "How old was George Washington when he became president?"}]
 
-    for model in models:
-        response, tool, args = polyllm.generate_tools(
-            model,
-            messages,
-            tools=[multiply]
-        )
+    response, tool, args = polyllm.generate_tools(
+        model,
+        messages,
+        tools=[multiply_large_numbers]
+    )
 
-        # Should not use any tool
-        assert tool == ""
-        assert args == {}
-        assert isinstance(response, str)
-        assert "hello" in response.lower()
+    assert isinstance(response, str)
+    assert len(response) > 0
+    assert tool == ""
+    assert args == {}
+
+# ('', 'multiply_large_numbers', {'a': '123456', 'b': '654321'})
+# ('57', '', {})

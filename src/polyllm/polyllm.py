@@ -8,12 +8,6 @@ import time
 from typing import Callable, Generator
 from pydantic import BaseModel
 
-# Anthropic may return multiple json objects in streaming mode
-#     Add a warning?
-# Add rate limit checks to other models?
-# Convert _llamapython_tools to use grammar rather than response_format,schema
-# Convert _llamacpp_tools from JSON mode to Structured Output mode
-# Change system message extraction to always grab the latest one
 
 try:
     from llama_cpp import Llama, LlamaGrammar
@@ -51,9 +45,14 @@ except ImportError:
     anthropic_import = False
 
 
+openai_client = None
 openai_key = None
+openai_models = []
 google_key = None
+google_models = []
 anthropic_key = None
+anthropic_models = []
+anthropic_client = None
 lazy_loaded = False
 def lazy_load():
     global openai_client, openai_models, openai_key
