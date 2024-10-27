@@ -13,7 +13,6 @@ from pydantic import BaseModel
 # Add rate limit checks to other models?
 # Convert _llamapython_tools to use grammar rather than response_format,schema
 # Convert _llamacpp_tools from JSON mode to Structured Output mode
-# json_freeform / json_pydantic
 # Change system message extraction to always grab the latest one
 
 try:
@@ -1290,21 +1289,3 @@ def _prepare_anthropic_tools(tools: list[Callable]):
 def _load_image(image_path):
     with open(image_path, "rb") as image_file:
         return image_file.read()
-
-
-if __name__ == '__main__':
-    lazy_load()
-
-    print('OpenAI:')
-    for model in openai_models:
-        print(' ', model)
-    print()
-
-    print('Google:')
-    for model in google_models:
-        print(' ', model)
-    print()
-
-    print('Anthropic:')
-    for model in anthropic_models:
-        print(' ', model)
