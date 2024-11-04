@@ -974,8 +974,8 @@ def _prepare_openai_messages(messages):
                     content.append({
                         'type': 'image_url',
                         'image_url': {
-                            'url': f"data:image/jpeg;base64,{base64_image}"
-                        }
+                            'url': f"data:image/jpeg;base64,{base64_image}",
+                        },
                     })
                 else:
                     content.append(item)
@@ -1063,8 +1063,8 @@ def _prepare_anthropic_messages(messages):
                         "source": {
                             "type": "base64",
                             "media_type": "image/jpeg",
-                            "data": base64_image
-                        }
+                            "data": base64_image,
+                        },
                     })
         else:
             content = [{"type": "text", "text": message['content']}]
