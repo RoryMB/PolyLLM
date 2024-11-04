@@ -130,28 +130,49 @@ def generate(
     temperature: float = 0.0,
     json_object: bool = False,
     json_schema: BaseModel|None = None,
-) -> str:
+    stream: bool = False,
+) -> str | Generator[str, None, None]:
     if json_object and json_schema:
         raise ValueError("generate() cannot simultaneously support JSON mode (json_object) and Structured Object mode (json_schema)")
 
-    if llamapython_import and isinstance(model, Llama):
-        return _llamapython(model, messages, temperature, json_object, json_schema)
-    elif model.startswith('llamacpp/'):
-        model = model.split('/', maxsplit=1)[1]
-        return _llamacpp(model, messages, temperature, json_object, json_schema)
-    elif model.startswith('ollama/'):
-        model = model.split('/', maxsplit=1)[1]
-        return _ollama(model, messages, temperature, json_object, json_schema)
-    else:
-        lazy_load()
-        if model in openai_models:
-            return _openai(model, messages, temperature, json_object, json_schema)
-        elif model in google_models:
-            return _google(model, messages, temperature, json_object, json_schema)
-        elif model in anthropic_models:
-            return _anthropic(model, messages, temperature, json_object, json_schema)
+    if stream:
+        if llamapython_import and isinstance(model, Llama):
+            return _llamapython(model, messages, temperature, json_object, json_schema)
+        elif model.startswith('llamacpp/'):
+            model = model.split('/', maxsplit=1)[1]
+            return _llamacpp(model, messages, temperature, json_object, json_schema)
+        elif model.startswith('ollama/'):
+            model = model.split('/', maxsplit=1)[1]
+            return _ollama(model, messages, temperature, json_object, json_schema)
         else:
-            raise ValueError(MODEL_ERR_MSG.format(model=model))
+            lazy_load()
+            if model in openai_models:
+                return _openai(model, messages, temperature, json_object, json_schema)
+            elif model in google_models:
+                return _google(model, messages, temperature, json_object, json_schema)
+            elif model in anthropic_models:
+                return _anthropic(model, messages, temperature, json_object, json_schema)
+            else:
+                raise ValueError(MODEL_ERR_MSG.format(model=model))
+    else:
+        if llamapython_import and isinstance(model, Llama):
+            return _llamapython_stream(model, messages, temperature, json_object, json_schema)
+        elif model.startswith('llamacpp/'):
+            model = model.split('/', maxsplit=1)[1]
+            return _llamacpp_stream(model, messages, temperature, json_object, json_schema)
+        elif model.startswith('ollama/'):
+            model = model.split('/', maxsplit=1)[1]
+            return _ollama_stream(model, messages, temperature, json_object, json_schema)
+        else:
+            lazy_load()
+            if model in openai_models:
+                return _openai_stream(model, messages, temperature, json_object, json_schema)
+            elif model in google_models:
+                return _google_stream(model, messages, temperature, json_object, json_schema)
+            elif model in anthropic_models:
+                return _anthropic_stream(model, messages, temperature, json_object, json_schema)
+            else:
+                raise ValueError(MODEL_ERR_MSG.format(model=model))
 
 def generate_stream(
     model: str|Llama, # type: ignore
@@ -248,6 +269,7 @@ def _llamapython(
     temperature: float,
     json_object: bool,
     json_schema: BaseModel|None,
+    stream: bool = False,
 ):
     transformed_messages = _prepare_llamacpp_messages(messages)
 
@@ -385,6 +407,7 @@ def _llamacpp(
     temperature: float,
     json_object: bool,
     json_schema: BaseModel|None,
+    stream: bool = False,
 ):
     transformed_messages = _prepare_llamacpp_messages(messages)
 
@@ -533,6 +556,7 @@ def _ollama(
     temperature: float,
     json_object: bool,
     json_schema: BaseModel|None,
+    stream: bool = False,
 ):
     transformed_messages = _prepare_ollama_messages(messages)
 
@@ -663,6 +687,7 @@ def _ollama_tools(
 #     temperature: float,
 #     json_object: bool,
 #     json_schema: BaseModel|None,
+#     stream: bool = False,
 # ):
 #     transformed_messages = _prepare_ollama_messages(messages)
 
@@ -725,6 +750,7 @@ def _openai(
     temperature: float,
     json_object: bool,
     json_schema: BaseModel|None,
+    stream: bool = False,
 ):
     transformed_messages = _prepare_openai_messages(messages)
 
@@ -843,6 +869,7 @@ def _google(
     temperature: float,
     json_object: bool,
     json_schema: BaseModel|None,
+    stream: bool = False,
 ):
     system_message = _prepare_google_system_message(messages)
     transformed_messages = _prepare_google_messages(messages)
@@ -1004,6 +1031,7 @@ def _anthropic(
     temperature: float,
     json_object: bool,
     json_schema: BaseModel|None,
+    stream: bool = False,
 ):
     system_message = _prepare_anthropic_system_message(messages)
     transformed_messages = _prepare_anthropic_messages(messages)
