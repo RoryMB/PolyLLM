@@ -938,9 +938,12 @@ def _prepare_llamacpp_messages(messages):
         if 'content' in message and isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'image_url':
-                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
-                    continue
+                if item.get('type') == 'image_path':
+                    image_data = _load_image_path(item['image_path'])
+                elif item.get('type') == 'image_cv2':
+                    image_data = _load_image_cv2(item['image_cv2'])
+                elif item.get('type') == 'image_pil':
+                    image_data = _load_image_pil(item['image_pil'])
                 else:
                     content.append(item)
         else:
