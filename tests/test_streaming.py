@@ -10,7 +10,8 @@ def test_streaming(model):
     ]
 
     chunks = []
-    for chunk in polyllm.generate_stream(model, messages):
+    for chunk in polyllm.generate(model, messages, stream=True):
+    # for chunk in polyllm.generate_stream(model, messages):
         assert isinstance(chunk, str)
         chunks.append(chunk)
     full_response = "".join(chunks)

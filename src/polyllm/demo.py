@@ -188,8 +188,8 @@ if LLAMA_PYTHON_MODEL:
     print(polyllm.generate_tools(llm, tool_message1, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool or knowledge `polyllm.generate(model, messages, tools=[func])`: (Should refuse to respond)"))
     print(polyllm.generate_tools(llm, tool_message2, tools=[multiply_large_numbers]))
-    print(purple("\n==== Testing streaming `polyllm.generate_stream(model, messages)`: (Should tell a joke)"))
-    for chunk in polyllm.generate_stream(llm, text_messages):
+    print(purple("\n==== Testing streaming `polyllm.generate(model, messages, stream=True)`: (Should tell a joke)"))
+    for chunk in polyllm.generate(llm, text_messages, stream=True):
         print(chunk, end='', flush=True)
     print()
 
@@ -209,8 +209,8 @@ if LLAMA_PYTHON_SERVER_PORT:
     print(polyllm.generate_tools(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", tool_message1, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool or knowledge `polyllm.generate(model, messages, tools=[func])`: (Should refuse to respond)"))
     print(polyllm.generate_tools(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", tool_message2, tools=[multiply_large_numbers]))
-    print(purple("\n==== Testing streaming `polyllm.generate_stream(model, messages)`: (Should tell a joke)"))
-    for chunk in polyllm.generate_stream(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", text_messages):
+    print(purple("\n==== Testing streaming `polyllm.generate(model, messages, stream=True)`: (Should tell a joke)"))
+    for chunk in polyllm.generate(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", text_messages, stream=True):
         print(chunk, end='', flush=True)
     print()
 
@@ -226,8 +226,8 @@ if OLLAMA_MODEL:
     print(polyllm.generate_tools(f"ollama/{OLLAMA_MODEL}", tool_message1, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool or knowledge `polyllm.generate(model, messages, tools=[func])`: (Should refuse to respond)"))
     print(polyllm.generate_tools(f"ollama/{OLLAMA_MODEL}", tool_message2, tools=[multiply_large_numbers]))
-    print(purple("\n==== Testing streaming `polyllm.generate_stream(model, messages)`: (Should tell a joke)"))
-    for chunk in polyllm.generate_stream(f"ollama/{OLLAMA_MODEL}", text_messages):
+    print(purple("\n==== Testing streaming `polyllm.generate(model, messages, stream=True)`: (Should tell a joke)"))
+    for chunk in polyllm.generate(f"ollama/{OLLAMA_MODEL}", text_messages, stream=True):
         print(chunk, end='', flush=True)
     print()
 
@@ -250,8 +250,8 @@ if OPENAI_MODEL:
     print(polyllm.generate_tools(OPENAI_MODEL, tool_message1, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool or knowledge `polyllm.generate(model, messages, tools=[func])`: (Should refuse to respond)"))
     print(polyllm.generate_tools(OPENAI_MODEL, tool_message2, tools=[multiply_large_numbers]))
-    print(purple("\n==== Testing streaming `polyllm.generate_stream(model, messages)`: (Should tell a joke)"))
-    for chunk in polyllm.generate_stream(OPENAI_MODEL, text_messages):
+    print(purple("\n==== Testing streaming `polyllm.generate(model, messages, stream=True)`: (Should tell a joke)"))
+    for chunk in polyllm.generate(OPENAI_MODEL, text_messages, stream=True):
         print(chunk, end='', flush=True)
     print()
 
@@ -275,8 +275,8 @@ if GOOGLE_MODEL:
     print(polyllm.generate_tools(GOOGLE_MODEL, tool_message1, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool or knowledge `polyllm.generate(model, messages, tools=[func])`: (Should refuse to respond)"))
     print(polyllm.generate_tools(GOOGLE_MODEL, tool_message2, tools=[multiply_large_numbers]))
-    print(purple("\n==== Testing streaming `polyllm.generate_stream(model, messages)`: (Should tell a joke)"))
-    for chunk in polyllm.generate_stream(GOOGLE_MODEL, text_messages):
+    print(purple("\n==== Testing streaming `polyllm.generate(model, messages, stream=True)`: (Should tell a joke)"))
+    for chunk in polyllm.generate(GOOGLE_MODEL, text_messages, stream=True):
         print(chunk, end='', flush=True)
     print()
 
@@ -295,7 +295,7 @@ if ANTHROPIC_MODEL:
     print(polyllm.generate_tools(ANTHROPIC_MODEL, tool_message1, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool or knowledge `polyllm.generate(model, messages, tools=[func])`: (Should refuse to respond)"))
     print(polyllm.generate_tools(ANTHROPIC_MODEL, tool_message2, tools=[multiply_large_numbers]))
-    print(purple("\n==== Testing streaming `polyllm.generate_stream(model, messages)`: (Should tell a joke)"))
-    for chunk in polyllm.generate_stream(ANTHROPIC_MODEL, text_messages):
+    print(purple("\n==== Testing streaming `polyllm.generate(model, messages, stream=True)`: (Should tell a joke)"))
+    for chunk in polyllm.generate(ANTHROPIC_MODEL, text_messages, stream=True):
         print(chunk, end='', flush=True)
     print()
