@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 from polyllm import polyllm
 
-def test_multimodal_filepath(model, test_image):
+def test_multimodal_path(model, test_image):
     """Test multimodal capabilities with file path input"""
     if not test_image:
         pytest.skip("No test image configured")
@@ -14,7 +14,7 @@ def test_multimodal_filepath(model, test_image):
             "role": "user",
             "content": [
                 {"type": "text", "text": "What's in this image?"},
-                {"type": "image_url", "image_url": {"url": test_image}},
+                {"type": "image_path", "image_path": test_image},
             ],
         },
     ]
@@ -27,8 +27,7 @@ def test_multimodal_cv2(model, test_image):
     """Test multimodal capabilities with cv2/numpy array input"""
     if not test_image:
         pytest.skip("No test image configured")
-    
-    # Load image as cv2/numpy array
+
     img_array = cv2.imread(test_image)
     assert img_array is not None, "Failed to load test image with cv2"
 
@@ -37,7 +36,7 @@ def test_multimodal_cv2(model, test_image):
             "role": "user",
             "content": [
                 {"type": "text", "text": "What's in this image?"},
-                {"type": "image_url", "image_url": {"url": img_array}},
+                {"type": "image_cv2", "image_cv2": img_array},
             ],
         },
     ]
@@ -50,8 +49,7 @@ def test_multimodal_pil(model, test_image):
     """Test multimodal capabilities with PIL Image input"""
     if not test_image:
         pytest.skip("No test image configured")
-    
-    # Load image as PIL Image
+
     pil_image = Image.open(test_image)
     assert pil_image is not None, "Failed to load test image with PIL"
 
@@ -60,7 +58,7 @@ def test_multimodal_pil(model, test_image):
             "role": "user",
             "content": [
                 {"type": "text", "text": "What's in this image?"},
-                {"type": "image_url", "image_url": {"url": pil_image}},
+                {"type": "image_pil", "image_pil": pil_image},
             ],
         },
     ]

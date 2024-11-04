@@ -939,11 +939,14 @@ def _prepare_llamacpp_messages(messages):
             content = []
             for item in message['content']:
                 if item.get('type') == 'image_path':
-                    image_data = _load_image_path(item['image_path'])
+                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
+                    continue
                 elif item.get('type') == 'image_cv2':
-                    image_data = _load_image_cv2(item['image_cv2'])
+                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
+                    continue
                 elif item.get('type') == 'image_pil':
-                    image_data = _load_image_pil(item['image_pil'])
+                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
+                    continue
                 else:
                     content.append(item)
         else:
@@ -959,11 +962,17 @@ def _prepare_ollama_messages(messages):
         if 'content' in message and isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'image_url':
+                if item.get('type') == 'image_path':
+                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
+                    continue
+                elif item.get('type') == 'image_cv2':
+                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
+                    continue
+                elif item.get('type') == 'image_pil':
                     warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
                     continue
                 else:
-                    content.append(item)
+                    content.append(item) # TODO
         else:
             content = message.get('content', '')
         messages_out.append({'role': message['role'], 'content': content})
@@ -979,8 +988,22 @@ def _prepare_openai_messages(messages):
             for item in message['content']:
                 if item.get('type') == 'image_path':
                     image_data = _load_image_path(item['image_path'])
+                    base64_image = base64.b64encode(image_data).decode('utf-8')
+                    content.append({
+                        'type': 'image_url',
+                        'image_url': {
+                            'url': f"data:image/jpeg;base64,{base64_image}",
+                        },
+                    })
                 elif item.get('type') == 'image_cv2':
                     image_data = _load_image_cv2(item['image_cv2'])
+                    base64_image = base64.b64encode(image_data).decode('utf-8')
+                    content.append({
+                        'type': 'image_url',
+                        'image_url': {
+                            'url': f"data:image/jpeg;base64,{base64_image}",
+                        },
+                    })
                 elif item.get('type') == 'image_pil':
                     image_data = _load_image_pil(item['image_pil'])
                     base64_image = base64.b64encode(image_data).decode('utf-8')
@@ -991,7 +1014,7 @@ def _prepare_openai_messages(messages):
                         },
                     })
                 else:
-                    content.append(item)
+                    content.append(item) # TODO
         else:
             content = message.get('content', '')
         messages_out.append({'role': message['role'], 'content': content})
@@ -1035,10 +1058,19 @@ def _prepare_google_messages(messages):
         if isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item['type'] == 'text':
+                if item.get('type') == 'text':
                     content.append(item['text'])
-                elif item['type'] == 'image_url':
-                    content.append({'mime_type': 'image/jpeg', 'data': _load_image_path(item['image_url']['url'])})
+                elif item.get('type') == 'image_path':
+                    image_data = _load_image_path(item['image_path'])
+                    content.append({'mime_type': 'image/jpeg', 'data': image_data})
+                elif item.get('type') == 'image_cv2':
+                    image_data = _load_image_cv2(item['image_cv2'])
+                    content.append({'mime_type': 'image/jpeg', 'data': image_data})
+                elif item.get('type') == 'image_pil':
+                    image_data = _load_image_pil(item['image_pil'])
+                    content.append({'mime_type': 'image/jpeg', 'data': image_data})
+                else:
+                    ... # TODO
         else:
             content = [message['content']]
 
@@ -1066,10 +1098,10 @@ def _prepare_anthropic_messages(messages):
         if isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item['type'] == 'text':
+                if item.get('type') == 'text':
                     content.append({"type": "text", "text": item['text']})
-                elif item['type'] == 'image_url':
-                    image_data = _load_image_path(item['image_url']['url'])
+                elif item.get('type') == 'image_path':
+                    image_data = _load_image_path(item['image_path'])
                     base64_image = base64.b64encode(image_data).decode('utf-8')
                     content.append({
                         "type": "image",
@@ -1079,6 +1111,30 @@ def _prepare_anthropic_messages(messages):
                             "data": base64_image,
                         },
                     })
+                elif item.get('type') == 'image_cv2':
+                    image_data = _load_image_cv2(item['image_cv2'])
+                    base64_image = base64.b64encode(image_data).decode('utf-8')
+                    content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": base64_image,
+                        },
+                    })
+                elif item.get('type') == 'image_pil':
+                    image_data = _load_image_pil(item['image_pil'])
+                    base64_image = base64.b64encode(image_data).decode('utf-8')
+                    content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": base64_image,
+                        },
+                    })
+                else:
+                    ... # TODO
         else:
             content = [{"type": "text", "text": message['content']}]
 
@@ -1117,40 +1173,16 @@ def _prepare_anthropic_tools(tools: list[Callable]):
     return anthropic_tools
 
 def _load_image_path(image_path: str) -> bytes:
-    """Load image data from a file path.
-
-    Args:
-        image_path: Path to the image file
-
-    Returns:
-        The image data as bytes
-    """
     with open(image_path, "rb") as image_file:
         return image_file.read()
 
 def _load_image_cv2(image: np.ndarray) -> bytes:
-    """Load image data from a cv2/numpy array.
-
-    Args:
-        image: Numpy array containing the image data
-
-    Returns:
-        The image data as bytes in JPEG format
-    """
     success, buffer = cv2.imencode('.jpg', image)
     if not success:
         raise ValueError("Failed to encode image")
     return buffer.tobytes()
 
 def _load_image_pil(image: Image.Image) -> bytes:
-    """Load image data from a PIL Image.
-
-    Args:
-        image: PIL Image object
-
-    Returns:
-        The image data as bytes in JPEG format
-    """
     from io import BytesIO
     buffer = BytesIO()
     image.save(buffer, format='JPEG')

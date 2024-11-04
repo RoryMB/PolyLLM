@@ -9,8 +9,8 @@ Links:
 ## Features
 
 - Unified interface for multiple LLM providers:
-  - Local LLMs (llama.cpp)
-  - Ollama
+  - Local LLMs ([llama.cpp](https://github.com/ggerganov/llama.cpp))
+  - [Ollama](https://ollama.com)
   - OpenAI (GPT models)
   - Google (Gemini models)
   - Anthropic (Claude models)
@@ -112,9 +112,11 @@ print(polyllm.json_to_pydantic(response, FlightList))
 - Google: Gemini Pro, etc.
 - Anthropic: Claude 3 (Opus, Sonnet, Haiku), Claude 2, etc.
 
+Run `python -m polyllm` to see the full list of known OpenAI, Google, and Anthropic models.
+
 | Model | Plain Text | Multimodal | JSON | Structured Output | Tool Usage | Streaming |
 |-------|------------|------------|------|------------------|------------|-----------|
-| Llama_cpp | ✅ | 🔶 | ✅ | ✅ | ✅ | ✅ |
+| llama.cpp | ✅ | 🔶 | ✅ | ✅ | ✅ | ✅ |
 | Ollama | ✅ | 🔶 | ✅ | ❌ | ✅ | ✅ |
 | Openai | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Google | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
