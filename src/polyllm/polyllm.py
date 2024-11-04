@@ -5,7 +5,10 @@ import json
 import os
 import textwrap
 import time
-from typing import Callable, Generator
+from typing import Callable, Generator, Union
+import numpy as np
+from PIL import Image
+import cv2
 from pydantic import BaseModel
 
 
@@ -1103,6 +1106,33 @@ def _prepare_anthropic_tools(tools: list[Callable]):
 
     return anthropic_tools
 
-def _load_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return image_file.read()
+def _load_image(image: Union[str, np.ndarray, Image.Image]) -> bytes:
+    """Load image data from various input types.
+    
+    Args:
+        image: Can be:
+            - A string file path
+            - A numpy array (from cv2)
+            - A PIL Image object
+    
+    Returns:
+        The image data as bytes in JPEG format
+    """
+    if isinstance(image, str):
+        # Handle file path
+        with open(image, "rb") as image_file:
+            return image_file.read()
+    elif isinstance(image, np.ndarray):
+        # Handle numpy array from cv2
+        success, buffer = cv2.imencode('.jpg', image)
+        if not success:
+            raise ValueError("Failed to encode image")
+        return buffer.tobytes()
+    elif isinstance(image, Image.Image):
+        # Handle PIL Image
+        from io import BytesIO
+        buffer = BytesIO()
+        image.save(buffer, format='JPEG')
+        return buffer.getvalue()
+    else:
+        raise ValueError(f"Unsupported image type: {type(image)}")
