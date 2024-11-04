@@ -1,16 +1,17 @@
-import re
-import backoff
 import base64
 import json
 import os
+import re
 import textwrap
 import time
-from typing import Callable, Generator, Union
+import warnings
+from typing import Callable, Generator
+
+import backoff
+import cv2
 import numpy as np
 from PIL import Image
-import cv2
 from pydantic import BaseModel
-
 
 try:
     from llama_cpp import Llama, LlamaGrammar
@@ -34,8 +35,8 @@ except ImportError:
 
 try:
     import google.generativeai as genai
-    from google.generativeai.types import HarmCategory, HarmBlockThreshold
     from google.api_core.exceptions import ResourceExhausted as GoogleResourceExhausted
+    from google.generativeai.types import HarmBlockThreshold, HarmCategory
     google_import = True
 except ImportError:
     google_import = False
@@ -938,6 +939,7 @@ def _prepare_llamacpp_messages(messages):
             content = []
             for item in message['content']:
                 if item.get('type') == 'image_url':
+                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
                     continue
                 else:
                     content.append(item)
@@ -955,6 +957,7 @@ def _prepare_ollama_messages(messages):
             content = []
             for item in message['content']:
                 if item.get('type') == 'image_url':
+                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
                     continue
                 else:
                     content.append(item)
@@ -1106,15 +1109,15 @@ def _prepare_anthropic_tools(tools: list[Callable]):
 
     return anthropic_tools
 
-def _load_image(image: Union[str, np.ndarray, Image.Image]) -> bytes:
+def _load_image(image: str|np.ndarray|Image.Image) -> bytes:
     """Load image data from various input types.
-    
+
     Args:
         image: Can be:
             - A string file path
             - A numpy array (from cv2)
             - A PIL Image object
-    
+
     Returns:
         The image data as bytes in JPEG format
     """
@@ -1135,4 +1138,4 @@ def _load_image(image: Union[str, np.ndarray, Image.Image]) -> bytes:
         image.save(buffer, format='JPEG')
         return buffer.getvalue()
     else:
-        raise ValueError(f"Unsupported image type: {type(image)}")
+        raise ValueError(f"Unsupported image type: {type(image)}. Must be string, numpy array, or PIL Image.")
