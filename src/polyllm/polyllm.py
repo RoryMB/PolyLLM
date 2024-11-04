@@ -1038,7 +1038,7 @@ def _prepare_google_messages(messages):
                 if item['type'] == 'text':
                     content.append(item['text'])
                 elif item['type'] == 'image_url':
-                    content.append({'mime_type': 'image/jpeg', 'data': _load_image(item['image_url']['url'])})
+                    content.append({'mime_type': 'image/jpeg', 'data': _load_image_path(item['image_url']['url'])})
         else:
             content = [message['content']]
 
@@ -1069,7 +1069,7 @@ def _prepare_anthropic_messages(messages):
                 if item['type'] == 'text':
                     content.append({"type": "text", "text": item['text']})
                 elif item['type'] == 'image_url':
-                    image_data = _load_image(item['image_url']['url'])
+                    image_data = _load_image_path(item['image_url']['url'])
                     base64_image = base64.b64encode(image_data).decode('utf-8')
                     content.append({
                         "type": "image",
