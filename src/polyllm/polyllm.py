@@ -974,8 +974,12 @@ def _prepare_openai_messages(messages):
         if 'content' in message and isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'image_url':
-                    image_data = _load_image(item['image_url']['url'])
+                if item.get('type') == 'image_path':
+                    image_data = _load_image_path(item['image_path'])
+                elif item.get('type') == 'image_cv2':
+                    image_data = _load_image_cv2(item['image_cv2'])
+                elif item.get('type') == 'image_pil':
+                    image_data = _load_image_pil(item['image_pil'])
                     base64_image = base64.b64encode(image_data).decode('utf-8')
                     content.append({
                         'type': 'image_url',
@@ -1109,33 +1113,42 @@ def _prepare_anthropic_tools(tools: list[Callable]):
 
     return anthropic_tools
 
-def _load_image(image: str|np.ndarray|Image.Image) -> bytes:
-    """Load image data from various input types.
+def _load_image_path(image_path: str) -> bytes:
+    """Load image data from a file path.
 
     Args:
-        image: Can be:
-            - A string file path
-            - A numpy array (from cv2)
-            - A PIL Image object
+        image_path: Path to the image file
+
+    Returns:
+        The image data as bytes
+    """
+    with open(image_path, "rb") as image_file:
+        return image_file.read()
+
+def _load_image_cv2(image: np.ndarray) -> bytes:
+    """Load image data from a cv2/numpy array.
+
+    Args:
+        image: Numpy array containing the image data
 
     Returns:
         The image data as bytes in JPEG format
     """
-    if isinstance(image, str):
-        # Handle file path
-        with open(image, "rb") as image_file:
-            return image_file.read()
-    elif isinstance(image, np.ndarray):
-        # Handle numpy array from cv2
-        success, buffer = cv2.imencode('.jpg', image)
-        if not success:
-            raise ValueError("Failed to encode image")
-        return buffer.tobytes()
-    elif isinstance(image, Image.Image):
-        # Handle PIL Image
-        from io import BytesIO
-        buffer = BytesIO()
-        image.save(buffer, format='JPEG')
-        return buffer.getvalue()
-    else:
-        raise ValueError(f"Unsupported image type: {type(image)}. Must be string, numpy array, or PIL Image.")
+    success, buffer = cv2.imencode('.jpg', image)
+    if not success:
+        raise ValueError("Failed to encode image")
+    return buffer.tobytes()
+
+def _load_image_pil(image: Image.Image) -> bytes:
+    """Load image data from a PIL Image.
+
+    Args:
+        image: PIL Image object
+
+    Returns:
+        The image data as bytes in JPEG format
+    """
+    from io import BytesIO
+    buffer = BytesIO()
+    image.save(buffer, format='JPEG')
+    return buffer.getvalue()
