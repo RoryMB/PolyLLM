@@ -86,16 +86,25 @@ def lazy_load():
     if anthropic_import and os.environ.get("ANTHROPIC_API_KEY"):
         anthropic_client = anthropic.Anthropic()
         anthropic_models = [
-            "claude-3-5-sonnet-latest",
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-sonnet-20240620",
-            "claude-3-sonnet-20240229",
-            "claude-3-opus-latest",
-            "claude-3-opus-20240229",
-            "claude-3-haiku-latest",
-            "claude-3-haiku-20240307",
-            "claude-2.1",
+            "claude-1.0",
+            "claude-1.1",
+            "claude-1.2",
+            "claude-1.3-100k",
+            "claude-1.3",
             "claude-2.0",
+            "claude-2.1",
+            "claude-3-5-haiku-20241022",
+            "claude-3-5-haiku-latest",
+            "claude-3-5-sonnet-20240620",
+            "claude-3-5-sonnet-20241022",
+            "claude-3-5-sonnet-latest",
+            "claude-3-haiku-20240307",
+            "claude-3-opus-20240229",
+            "claude-3-opus-latest",
+            "claude-3-sonnet-20240229",
+            "claude-instant-1.0",
+            "claude-instant-1.1-100k",
+            "claude-instant-1.1",
             "claude-instant-1.2",
         ]
         anthropic_key = True
@@ -210,6 +219,13 @@ def json_to_pydantic(json_response: str, pydantic_model: type[BaseModel]) -> Bas
         raise ValueError(f"Error creating Pydantic model: {e}")
 
     return instance
+
+def get_tool_func(tools: list[Callable], tool: str):
+    for func in tools:
+        if func.__name__ == tool:
+            return func
+
+    return None
 
 def _extract_last_json(text):
     # Find all potential JSON objects in the text
@@ -571,67 +587,42 @@ def _ollama_tools(
 
     return text, tool, args
 
+def _ollama2(
+    model: str,
+    messages: list,
+    temperature: float,
+    json_object: bool,
+    json_schema: BaseModel|None,
+    stream: bool = False,
+):
+    transformed_messages = _prepare_ollama_messages(messages)
 
-# NEW
-# def _ollama(
-#     model: str,
-#     messages: list,
-#     temperature: float,
-#     json_object: bool,
-#     json_schema: BaseModel|None,
-#     stream: bool = False,
-# ):
-#     transformed_messages = _prepare_ollama_messages(messages)
+    kwargs = {
+        "model": model,
+        "messages": transformed_messages,
+        "stream": stream,
+        "options": {
+            "temperature": temperature,
+            "num_ctx": 2048,
+        }
+    }
 
-#     kwargs = {
-#         "model": model,
-#         "messages": transformed_messages,
-#         "stream": False,
-#         "options": {
-#             "temperature": temperature,
-#             "num_ctx": 2048,
-#         }
-#     }
+    if json_object:
+        kwargs["format"] = "json"
+    if json_schema:
+        raise NotImplementedError("Ollama does not support Structured Output")
 
-#     if json_object:
-#         kwargs["format"] = "json"
-#     if json_schema:
-#         raise NotImplementedError("Ollama does not support Structured Output")
+    response = ollama.chat(**kwargs)
 
-#     response = ollama.chat(**kwargs)
-
-#     text = response.message.content
-#     return text
-
-# def _ollama_stream(
-#     model: str,
-#     messages: list,
-#     temperature: float,
-#     json_object: bool,
-#     json_schema: BaseModel|None,
-# ):
-#     transformed_messages = _prepare_ollama_messages(messages)
-
-#     kwargs = {
-#         "model": model,
-#         "messages": transformed_messages,
-#         "stream": True,
-#         "options": {
-#             "temperature": temperature,
-#             "num_ctx": 2048,
-#         }
-#     }
-
-#     if json_object:
-#         kwargs["format"] = "json"
-#     if json_schema:
-#         raise NotImplementedError("Ollama does not support Structured Output")
-
-#     response = ollama.chat(**kwargs)
-
-#     for chunk in response:
-#         if chunk['message']['content']:
-#             yield chunk['message']['content']
+    if stream:
+        def stream_generator():
+            for chunk in response:
+                if chunk['message']['content']:
+                    yield chunk['message']['content']
+        return stream_generator()
+    else:
+        text = response.message.content
+        return text
 
 # https://github.com/ollama/ollama/blob/main/docs/api.md#parameters-1
 

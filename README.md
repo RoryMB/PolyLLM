@@ -16,10 +16,39 @@ Links:
   - Anthropic (Claude models)
 - Support for different interaction modes:
   - Standard text completion
+  - Function calling / tools
   - JSON output
   - Structured output (using Pydantic models)
-  - Function calling / tools
 - Streaming support for real-time responses
+
+### Feature Support Across Providers
+
+#### Non-Streaming
+
+| Provider | Plain Text | Image Input | JSON | Structured Output | Tool Usage |
+|----------|------------|-------------|------|-------------------|------------|
+| llama.cpp | ✅ | 🔶 | ✅ | ✅ | ✅ |
+| Ollama    | ✅ | 🔶 | ✅ | ❌ | ✅ |
+| Openai    | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Google    | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Anthropic | ✅ | ✅ | ✅ | ❌ | ✅ |
+
+#### Streaming
+
+| Provider | Plain Text | Image Input | JSON | Structured Output | Tool Usage |
+|----------|------------|-------------|------|-------------------|------------|
+| llama.cpp | - | - | - | - | - |
+| Ollama    | - | - | - | - | - |
+| Openai    | - | - | - | - | - |
+| Google    | - | - | - | - | - |
+| Anthropic | - | - | - | - | - |
+
+✅: Supported
+
+🔶: Support planned
+
+❌: Not yet supported by the LLM provider
+
 
 ## Installation
 
@@ -28,7 +57,27 @@ pip install polyllm
 ```
 
 ```bash
-pip install polyllm[all] # Get all llamacpp, ollama, openai, google, anthropic packages
+pip install polyllm[all] # Gets all llamacpp, ollama, openai, google, anthropic packages
+```
+
+### Requirements
+
+- Python 3.9+
+- Optional dependencies based on which LLM providers you want to use:
+  - `openai`
+  - `google-generativeai`
+  - `anthropic`
+  - `llama-cpp-python`
+  - `ollama`
+
+## Configuration
+
+Set your API keys as environment variables:
+
+```bash
+export OPENAI_API_KEY="your-key-here"
+export GOOGLE_API_KEY="your-key-here"
+export ANTHROPIC_API_KEY="your-key-here"
 ```
 
 ## Demo
@@ -48,44 +97,116 @@ python -m polyllm.demo \
 
 ```python
 import polyllm
+```
 
-# Basic usage
+Run `python -m polyllm` to see the full list of known OpenAI, Google, and Anthropic models.
+
+### Basic Usage
+```python
 response = polyllm.generate(
     model="gpt-3.5-turbo",
     messages=[{"role": "user", "content": "Hello, how are you?"}],
-    temperature=0.7,
+    temperature=0.2,
 )
 print(response)
 
-# Streaming response
-for chunk in polyllm.generate_stream(
+# Prints:
+# Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?
+```
+
+### Streaming Response
+```python
+for chunk in polyllm.generate(
     model="gpt-4",
     messages=[{"role": "user", "content": "Tell me a story"}],
     temperature=0.7,
+    stream=True,
 ):
     print(chunk, end='', flush=True)
+print()
 
-# Using tools/functions
-def multiply(x: int, y: int) -> int:
-    """Multiply two numbers"""
-    return x * y
+# Prints (a word or so at a time):
+# Once upon a time, ...
+```
 
-response, tool, args = polyllm.generate_tools(
-    model="gemini-pro",
-    messages=[{"role": "user", "content": "What is 7 times 6?"}],
-    tools=[multiply],
+### Multimodal (Image Input)
+```python
+messages = [{
+    "role": "user",
+    "content": [
+        {"type": "text", "text": "What's in this image?"},
+        {"type": "image_path", "image_path": "/path/to/image"},
+
+        # These also work if you have the image as
+        # an np.array / PIL Image instead of on disk:
+
+        # {"type": "image_cv2", "image_cv2": cv2.imread("/path/to/image")},
+        # {"type": "image_pil", "image_pil": Image.open("/path/to/image")},
+    ],
+}]
+
+response = polyllm.generate(
+    model="claude-3-5-sonnet-latest",
+    messages=messages,
 )
 print(response)
+```
 
-# JSON output
+### Using Tools / Function Calling
+```python
+def multiply_large_numbers(x: int, y: int) -> int:
+    """Multiplies two large numbers."""
+    return x * y
+
+
+tools = [multiply_large_numbers]
+response, tool, args = polyllm.generate_tools(
+    model="gemini-1.5-pro-latest",
+    messages=[{"role": "user", "content": "What is 123456 multiplied by 654321?"}],
+    tools=tools,
+)
+
+tool_func = polyllm.get_tool_func(tools, tool)
+if tool_func:
+    # print('response:', response)  # Some models (Anthropic) may return both their tool call AND a text response
+    tool_result = tool_func(**args)
+    print(tool_result)  # 123456 * 654321 = 80779853376
+else:
+    print(response)
+
+# Prints:
+# 80779853376.0
+```
+
+### JSON Output
+```python
 response = polyllm.generate(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-3-5-sonnet-latest",
     messages=[{"role": "user", "content": "List three colors in JSON"}],
     json_object=True,
 )
 print(response)
 
-# Controlled JSON output
+# Prints:
+# {
+#   "colors": [
+#     "red",
+#     "blue",
+#     "green"
+#   ]
+# }
+
+import json
+print(json.loads(response))
+
+# Prints:
+# {'colors': ['red', 'blue', 'green']}
+```
+
+### Controlled JSON Output
+> [!WARNING]
+> Not supported by Ollama or Anthropic.
+```python
 from pydantic import BaseModel, Field
 
 class Flight(BaseModel):
@@ -95,55 +216,20 @@ class Flight(BaseModel):
 class FlightList(BaseModel):
     flights: list[Flight] = Field(description="A list of known flight details")
 
-messages = [
-    {"role": "user", "content": "Write a list of 2 to 5 random flight details."}
-]
 
-response = polyllm.generate(model, messages, json_schema=FlightList)
+response = polyllm.generate(
+    model="gemini-1.5-pro-latest",
+    messages=[{"role": "user", "content": "Write a list of 2 to 5 random flight details."}],
+    json_schema=FlightList,
+)
 print(response)
-print(polyllm.json_to_pydantic(response, FlightList))
+
+# Prints:
+# {"flights": [{"departure_time": "2024-07-20T08:30", "destination": "JFK"}, {"departure_time": "2024-07-21T14:00", "destination": "LAX"}, {"departure_time": "2024-07-22T16:45", "destination": "ORD"}, {"departure_time": "2024-07-23T09:15", "destination": "SFO"}]}
+
+pydantic_object = polyllm.json_to_pydantic(response, FlightList)
+print(pydantic_object.flights[0].destination)
+
+# Prints:
+# JFK
 ```
-
-## Supported Models
-
-- Local LLMs via llama.cpp
-- Ollama models
-- OpenAI: GPT-3.5, GPT-4, etc.
-- Google: Gemini Pro, etc.
-- Anthropic: Claude 3 (Opus, Sonnet, Haiku), Claude 2, etc.
-
-Run `python -m polyllm` to see the full list of known OpenAI, Google, and Anthropic models.
-
-| Model | Plain Text | Multimodal | JSON | Structured Output | Tool Usage | Streaming |
-|-------|------------|------------|------|------------------|------------|-----------|
-| llama.cpp | ✅ | 🔶 | ✅ | ✅ | ✅ | ✅ |
-| Ollama | ✅ | 🔶 | ✅ | ❌ | ✅ | ✅ |
-| Openai | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Google | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Anthropic | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
-
-✅: Supported
-
-🔶: Support planned
-
-❌: Not yet supported by model provider
-
-## Configuration
-
-Set your API keys as environment variables:
-
-```bash
-export OPENAI_API_KEY="your-key-here"
-export GOOGLE_API_KEY="your-key-here"
-export ANTHROPIC_API_KEY="your-key-here"
-```
-
-## Requirements
-
-- Python 3.9+
-- Optional dependencies based on which LLM providers you want to use:
-  - `openai`
-  - `google-generativeai`
-  - `anthropic`
-  - `llama-cpp-python`
-  - `ollama`
