@@ -15,39 +15,40 @@ Links:
   - Google (Gemini models)
   - Anthropic (Claude models)
 - Support for different interaction modes:
-  - Standard text completion
+  - Standard chat completion
+  - Multimodal through image input
   - Function calling / tools
   - JSON output
   - Structured output (using Pydantic models)
-- Streaming support for real-time responses
+  - Streaming real-time responses
 
 ### Feature Support Across Providers
 
-#### Non-Streaming
-
-| Provider | Plain Text | Image Input | JSON | Structured Output | Tool Usage |
-|----------|------------|-------------|------|-------------------|------------|
+| Provider | Standard Chat | Image Input | JSON | Structured Output | Tool Usage |
+|----------|---------------|-------------|------|-------------------|------------|
 | llama.cpp | ✅ | 🔶 | ✅ | ✅ | ✅ |
 | Ollama    | ✅ | 🔶 | ✅ | ❌ | ✅ |
 | Openai    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Google    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Anthropic | ✅ | ✅ | ✅ | ❌ | ✅ |
 
-#### Streaming
+#### Streaming Output Modes
 
-| Provider | Plain Text | Image Input | JSON | Structured Output | Tool Usage |
-|----------|------------|-------------|------|-------------------|------------|
-| llama.cpp | - | - | - | - | - |
-| Ollama    | - | - | - | - | - |
-| Openai    | - | - | - | - | - |
-| Google    | - | - | - | - | - |
-| Anthropic | - | - | - | - | - |
+| Provider | Plain Text | JSON | Structured Output | Tool Usage |
+|----------|------------|------|-------------------|------------|
+| llama.cpp | ✅ | ✅ | ✅ | 🟫 |
+| Ollama    | ✅ | ✅ | ❌ | 🟫 |
+| Openai    | ✅ | ✅ | ❌ | 🟫 |
+| Google    | ✅ | ✅ | ✅ | 🟫 |
+| Anthropic | ✅ | 🟫 | ❌ | 🟫 |
 
 ✅: Supported
 
 🔶: Support planned
 
 ❌: Not yet supported by the LLM provider
+
+🟫: Support not planned
 
 
 ## Installation
@@ -93,7 +94,21 @@ python -m polyllm.demo \
     --anthropic-model claude-3-5-sonnet-latest
 ```
 
-## Quick Start
+## Overview
+
+generate()
+
+Options for MODEL
+
+generate_tools()
+
+pydantic_to_schema()
+
+json_to_pydantic()
+
+get_tool_func()
+
+## Quick Start Examples
 
 ```python
 import polyllm
@@ -203,7 +218,7 @@ print(json.loads(response))
 # {'colors': ['red', 'blue', 'green']}
 ```
 
-### Controlled JSON Output
+### Structured Output
 > [!WARNING]
 > Not supported by Ollama or Anthropic.
 ```python

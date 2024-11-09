@@ -29,6 +29,7 @@ except ImportError:
 
 try:
     from openai import OpenAI
+    openai_client = OpenAI()
     openai_import = True
 except ImportError:
     openai_import = False
@@ -37,6 +38,7 @@ try:
     import google.generativeai as genai
     from google.api_core.exceptions import ResourceExhausted as GoogleResourceExhausted
     from google.generativeai.types import HarmBlockThreshold, HarmCategory
+    genai.configure()
     google_import = True
 except ImportError:
     google_import = False
@@ -44,48 +46,32 @@ except ImportError:
 
 try:
     import anthropic
+    anthropic_client = anthropic.Anthropic()
     anthropic_import = True
 except ImportError:
     anthropic_import = False
 
 
-openai_client = None
-openai_key = None
-openai_models = []
-google_key = None
-google_models = []
-anthropic_key = None
-anthropic_models = []
-anthropic_client = None
+_openai_models = []
+_google_models = []
+_anthropic_models = []
+
 lazy_loaded = False
 def lazy_load():
-    global openai_client, openai_models, openai_key
-    global google_models, google_key
-    global anthropic_client, anthropic_models, anthropic_key
-    global lazy_loaded
+    global lazy_loaded, _openai_models, _google_models, _anthropic_models
 
     if lazy_loaded:
         return
+    lazy_loaded = True
 
-    if openai_import and os.environ.get("OPENAI_API_KEY"):
-        openai_client = OpenAI()
-        openai_models = [model.id for model in list(openai_client.models.list())]
-        openai_key = True
-    else:
-        openai_models = []
-        openai_key = False
+    if openai_import:
+        _openai_models = sorted(model.id for model in list(openai_client.models.list()))
 
-    if google_import and os.environ.get("GOOGLE_API_KEY"):
-        genai.configure()
-        google_models = [model.name.split('/')[1] for model in genai.list_models()]
-        google_key = True
-    else:
-        google_models = []
-        google_key = False
+    if google_import:
+        _google_models = sorted(model.name.split('/')[1] for model in genai.list_models())
 
-    if anthropic_import and os.environ.get("ANTHROPIC_API_KEY"):
-        anthropic_client = anthropic.Anthropic()
-        anthropic_models = [
+    if anthropic_import:
+        _anthropic_models = sorted([
             "claude-1.0",
             "claude-1.1",
             "claude-1.2",
@@ -106,13 +92,19 @@ def lazy_load():
             "claude-instant-1.1-100k",
             "claude-instant-1.1",
             "claude-instant-1.2",
-        ]
-        anthropic_key = True
-    else:
-        anthropic_models = []
-        anthropic_key = False
+        ])
 
-    lazy_loaded = True
+def openai_models():
+    lazy_load()
+    return _openai_models
+
+def google_models():
+    lazy_load()
+    return _google_models
+
+def anthropic_models():
+    lazy_load()
+    return _anthropic_models
 
 MODEL_ERR_MSG = "PolyLLM could not find model: {model}. Run `python -m polyllm` to see a list of known models."
 if not all((llamapython_import, openai_import, google_import, anthropic_import)):
@@ -125,16 +117,7 @@ if not all((llamapython_import, openai_import, google_import, anthropic_import))
         missing.append('google-generativeai')
     if not anthropic_import:
         missing.append('anthropic')
-    MODEL_ERR_MSG += " Failed imports: pip install " + " ".join(missing) + " ."
-if any((openai_import and (openai_key is False), google_import and (google_key is False), anthropic_import and (anthropic_key is False))):
-    missing = []
-    if openai_import and (openai_key is False):
-        missing.append('OPENAI_API_KEY')
-    if google_import and (google_key is False):
-        missing.append('GOOGLE_API_KEY')
-    if anthropic_import and (anthropic_key is False):
-        missing.append('ANTHROPIC_API_KEY')
-    MODEL_ERR_MSG += " Missing API keys: " + ", ".join(missing) + " ."
+    MODEL_ERR_MSG += " Note: Imports failed for: pip install " + " ".join(missing) + " ."
 
 
 def generate(
@@ -158,13 +141,21 @@ def generate(
     elif model.startswith('ollama/'):
         model = model.split('/', maxsplit=1)[1]
         func = _ollama
+    elif model.startswith('openai/'):
+        model = model.split('/', maxsplit=1)[1]
+        func = _openai
+    elif model.startswith('google/'):
+        model = model.split('/', maxsplit=1)[1]
+        func = _google
+    elif model.startswith('anthropic/'):
+        model = model.split('/', maxsplit=1)[1]
+        func = _anthropic
     else:
-        lazy_load()
-        if model in openai_models:
+        if model in openai_models():
             func = _openai
-        elif model in google_models:
+        elif model in google_models():
             func = _google
-        elif model in anthropic_models:
+        elif model in anthropic_models():
             func = _anthropic
 
     if func:
@@ -187,24 +178,37 @@ def generate_tools(
     temperature: float = 0.0,
     tools: list[Callable] = None,
 ) -> list:
+    func = None
+
     if llamapython_import and isinstance(model, Llama):
-        return _llamapython_tools(model, messages, temperature, tools)
+        func = _llamapython_tools
     elif model.startswith('llamacpp/'):
         model = model.split('/', maxsplit=1)[1]
-        return _llamacpp_tools(model, messages, temperature, tools)
+        func = _llamacpp_tools
     elif model.startswith('ollama/'):
         model = model.split('/', maxsplit=1)[1]
-        return _ollama_tools(model, messages, temperature, tools)
+        func = _ollama_tools
+    elif model.startswith('openai/'):
+        model = model.split('/', maxsplit=1)[1]
+        func = _openai_tools
+    elif model.startswith('google/'):
+        model = model.split('/', maxsplit=1)[1]
+        func = _google_tools
+    elif model.startswith('anthropic/'):
+        model = model.split('/', maxsplit=1)[1]
+        func = _anthropic_tools
     else:
-        lazy_load()
-        if model in openai_models:
-            return _openai_tools(model, messages, temperature, tools)
-        elif model in google_models:
-            return _google_tools(model, messages, temperature, tools)
-        elif model in anthropic_models:
-            return _anthropic_tools(model, messages, temperature, tools)
-        else:
-            raise ValueError(MODEL_ERR_MSG.format(model=model))
+        if model in openai_models():
+            func = _openai_tools
+        elif model in google_models():
+            func = _google_tools
+        elif model in anthropic_models():
+            func = _anthropic_tools
+
+    if func:
+        return func(model, messages, temperature, tools)
+    else:
+        raise ValueError(MODEL_ERR_MSG.format(model=model))
 
 def pydantic_to_schema(json_schema: BaseModel, indent: int|str|None = None) -> str:
     return json.dumps(json_schema.model_json_schema(), indent=indent)
@@ -502,6 +506,7 @@ def _ollama(
     if json_object:
         kwargs["response_format"] = {"type": "json_object"}
     if json_schema:
+        # TODO: Exception
         raise NotImplementedError("Ollama does not support Structured Output")
 
     client = OpenAI(
@@ -648,9 +653,10 @@ def _openai(
     if json_object:
         kwargs["response_format"] = {"type": "json_object"}
     if json_schema:
-        # Structured Object mode doesn't currently support streaming
+        # Structured Output mode doesn't currently support streaming
         stream = False
         kwargs.pop("stream")
+        # TODO: Warn
         kwargs["response_format"] = json_schema
 
     if stream:
@@ -860,6 +866,8 @@ def _anthropic(
         kwargs["system"] = system_message
 
     if json_object:
+        stream = False
+        # TODO: Warn
         transformed_messages.append(
             {
                 "role": "assistant",
@@ -867,6 +875,7 @@ def _anthropic(
             }
         )
     if json_schema:
+        # TODO: Exception
         raise NotImplementedError("Anthropic does not support Structured Output")
 
     if stream:
