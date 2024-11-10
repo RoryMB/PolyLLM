@@ -19,7 +19,7 @@ parser.add_argument("--llama-python-model", help="Path to the llama-cpp-python m
 parser.add_argument("--llama-python-server-port", help="Port for the llama.cpp server. Make sure llama_cpp is running: `python -m llama_cpp.server --n_gpu_layers -1 --model path/to/model.gguf`")
 parser.add_argument("--ollama-model", help="Name of the Ollama model to use. Make sure Ollama is running. Llama3.1 is suggested, pull it with: `ollama pull llama3.1`")
 parser.add_argument("--openai-model", help="Name of the OpenAI model to use (e.g., gpt-4o)")
-parser.add_argument("--google-model", help="Name of the Google model to use (e.g., gemini-1.5-pro). 'gemini-1.5-pro' is required for structured object use.")
+parser.add_argument("--google-model", help="Name of the Google model to use (e.g., gemini-1.5-pro). 'gemini-1.5-pro' is required for structured output use.")
 parser.add_argument("--anthropic-model", help="Name of the Anthropic model to use (e.g., claude-3-5-sonnet-latest)")
 args = parser.parse_args()
 
@@ -106,13 +106,13 @@ image_messages = [
         "role": "user",
         "content": [
             {"type": "text", "text": "What's in this image?"},
-            {"type": "image_path", "image_path": IMAGE_PATH},
+            {"type": "image", "image": IMAGE_PATH},
         ],
     },
 ]
 
 
-# Example for json_object output.
+# Example for json_output output.
 # Tests enforcement of JSON responses.
 json_messages = [
     {
@@ -136,7 +136,7 @@ class Flight(BaseModel):
     destination: str = Field(description="The destination of the flight")
 class FlightList(BaseModel):
     flights: list[Flight] = Field(description="A list of known flight details")
-flight_list_schema = polyllm.pydantic_to_schema(FlightList, indent=2)
+flight_list_schema = polyllm.structured_output_model_to_schema(FlightList, indent=2)
 pydantic_messages = [
     {
         "role": "user",
@@ -176,12 +176,12 @@ if LLAMA_PYTHON_MODEL:
     print(green('======== LlamaCPP Python'))
     print(purple("==== Testing plain text conversation `polyllm.generate(model, messages)`: (Should tell a joke)"))
     print(polyllm.generate(llm, text_messages))
-    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_object=True)`: (Should format: George, Washington, 1789-1797)"))
-    print(polyllm.generate(llm, json_messages, json_object=True))
-    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, json_schema=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
-    output = polyllm.generate(llm, json_messages, json_schema=FlightList)
+    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_output=True)`: (Should format: George, Washington, 1789-1797)"))
+    print(polyllm.generate(llm, json_messages, json_output=True))
+    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
+    output = polyllm.generate(llm, json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.json_to_pydantic(output, FlightList))
+    print(polyllm.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(llm, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -197,12 +197,12 @@ if LLAMA_PYTHON_SERVER_PORT:
     print(green(f'======== LlamaCPP Python Server (model="llamacpp/{LLAMA_PYTHON_SERVER_PORT}")'))
     print(purple("==== Testing plain text conversation `polyllm.generate(model, messages)`: (Should tell a joke)"))
     print(polyllm.generate(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", text_messages))
-    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_object=True)`: (Should format: George, Washington, 1789-1797)"))
-    print(polyllm.generate(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", json_messages, json_object=True))
-    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, json_schema=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
-    output = polyllm.generate(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", json_messages, json_schema=FlightList)
+    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_output=True)`: (Should format: George, Washington, 1789-1797)"))
+    print(polyllm.generate(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", json_messages, json_output=True))
+    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
+    output = polyllm.generate(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.json_to_pydantic(output, FlightList))
+    print(polyllm.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -218,8 +218,11 @@ if OLLAMA_MODEL:
     print(green(f'\n======== Ollama (model="ollama/{OLLAMA_MODEL}")'))
     print(purple("==== Testing plain text conversation `polyllm.generate(model, messages)`: (Should tell a joke)"))
     print(polyllm.generate(f"ollama/{OLLAMA_MODEL}", text_messages))
-    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_object=True)`: (Should format: George, Washington, 1789-1797)"))
-    print(polyllm.generate(f"ollama/{OLLAMA_MODEL}", json_messages, json_object=True))
+    if image_exists:
+        print(purple("\n==== Testing multi-modal image input: (Should describe your image)"))
+        print(polyllm.generate(f"ollama/{OLLAMA_MODEL}", image_messages))
+    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_output=True)`: (Should format: George, Washington, 1789-1797)"))
+    print(polyllm.generate(f"ollama/{OLLAMA_MODEL}", json_messages, json_output=True))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(f"ollama/{OLLAMA_MODEL}", tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -238,12 +241,12 @@ if OPENAI_MODEL:
     if image_exists:
         print(purple("\n==== Testing multi-modal image input: (Should describe your image)"))
         print(polyllm.generate(OPENAI_MODEL, image_messages))
-    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_object=True)`: (Should format: George, Washington, 1789-1797)"))
-    print(polyllm.generate(OPENAI_MODEL, json_messages, json_object=True))
-    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, json_schema=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
-    output = polyllm.generate(OPENAI_MODEL, json_messages, json_schema=FlightList)
+    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_output=True)`: (Should format: George, Washington, 1789-1797)"))
+    print(polyllm.generate(OPENAI_MODEL, json_messages, json_output=True))
+    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
+    output = polyllm.generate(OPENAI_MODEL, json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.json_to_pydantic(output, FlightList))
+    print(polyllm.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(OPENAI_MODEL, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -262,13 +265,13 @@ if GOOGLE_MODEL:
     if image_exists:
         print(purple("\n==== Testing multi-modal image input: (Should describe your image)"))
         print(polyllm.generate(GOOGLE_MODEL, image_messages))
-    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_object=True)`: (Should format: George, Washington, 1789-1797)"))
-    print(polyllm.generate(GOOGLE_MODEL, json_messages, json_object=True))
-    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, json_schema=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
+    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_output=True)`: (Should format: George, Washington, 1789-1797)"))
+    print(polyllm.generate(GOOGLE_MODEL, json_messages, json_output=True))
+    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
     print(purple('\n(model="gemini-1.5-pro")'))
-    output = polyllm.generate("gemini-1.5-pro", json_messages, json_schema=FlightList)
+    output = polyllm.generate("gemini-1.5-pro", json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.json_to_pydantic(output, FlightList))
+    print(polyllm.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(GOOGLE_MODEL, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -287,8 +290,8 @@ if ANTHROPIC_MODEL:
     if image_exists:
         print(purple("\n==== Testing multi-modal image input: (Should describe your image)"))
         print(polyllm.generate(ANTHROPIC_MODEL, image_messages))
-    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_object=True)`: (Should format: George, Washington, 1789-1797)"))
-    print(polyllm.generate(ANTHROPIC_MODEL, json_messages, json_object=True))
+    print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_output=True)`: (Should format: George, Washington, 1789-1797)"))
+    print(polyllm.generate(ANTHROPIC_MODEL, json_messages, json_output=True))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(ANTHROPIC_MODEL, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))

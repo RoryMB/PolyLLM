@@ -9,9 +9,9 @@ class Flight(BaseModel):
 class FlightList(BaseModel):
     flights: list[Flight] = Field(description="A list of known flight details")
 
-def test_structuredt(model):
+def test_structured(model):
     """Test structured output using Pydantic models"""
-    flight_list_schema = polyllm.pydantic_to_schema(FlightList, indent=2)
+    flight_list_schema = polyllm.structured_output_model_to_schema(FlightList, indent=2)
     messages = [
         {
             "role": "user",
@@ -22,9 +22,9 @@ def test_structuredt(model):
         },
     ]
 
-    response = polyllm.generate(model, messages, json_schema=FlightList)
+    response = polyllm.generate(model, messages, structured_output_model=FlightList)
     assert isinstance(response, str)
     assert len(response) > 0
 
     # Verify we can parse it into our Pydantic model
-    polyllm.json_to_pydantic(response, FlightList)
+    polyllm.structured_output_to_object(response, FlightList)

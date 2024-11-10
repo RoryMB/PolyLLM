@@ -14,7 +14,7 @@ def test_multimodal_path(model, test_image):
             "role": "user",
             "content": [
                 {"type": "text", "text": "What's in this image?"},
-                {"type": "image_path", "image_path": test_image},
+                {"type": "image", "image": test_image},
             ],
         },
     ]
@@ -36,7 +36,7 @@ def test_multimodal_cv2(model, test_image):
             "role": "user",
             "content": [
                 {"type": "text", "text": "What's in this image?"},
-                {"type": "image_cv2", "image_cv2": img_array},
+                {"type": "image", "image": img_array},
             ],
         },
     ]
@@ -58,7 +58,7 @@ def test_multimodal_pil(model, test_image):
             "role": "user",
             "content": [
                 {"type": "text", "text": "What's in this image?"},
-                {"type": "image_pil", "image_pil": pil_image},
+                {"type": "image", "image": pil_image},
             ],
         },
     ]

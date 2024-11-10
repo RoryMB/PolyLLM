@@ -1,7 +1,12 @@
 from . import polyllm
 
 if __name__ == '__main__':
-    print('OpenAI:')
+    print('Ollama: (Only lists locally pulled models)')
+    for model in polyllm.ollama_models():
+        print(' ', model)
+    print()
+
+    print('OpenAI: (Some listed models may not be chat models)')
     for model in polyllm.openai_models():
         print(' ', model)
     print()
@@ -11,6 +16,6 @@ if __name__ == '__main__':
         print(' ', model)
     print()
 
-    print('Anthropic:')
+    print('Anthropic: (Last updated - November 9, 2024)')
     for model in polyllm.anthropic_models():
         print(' ', model)

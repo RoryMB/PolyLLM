@@ -1,16 +1,12 @@
 import base64
 import json
-import os
 import re
 import textwrap
 import time
 import warnings
-from typing import Callable, Generator
+from typing import Callable, Generator, Literal, overload
 
 import backoff
-import cv2
-import numpy as np
-from PIL import Image
 from pydantic import BaseModel
 
 try:
@@ -52,23 +48,27 @@ except ImportError:
     anthropic_import = False
 
 
+_ollama_models = []
 _openai_models = []
 _google_models = []
 _anthropic_models = []
 
 lazy_loaded = False
 def lazy_load():
-    global lazy_loaded, _openai_models, _google_models, _anthropic_models
+    global lazy_loaded, _ollama_models, _openai_models, _google_models, _anthropic_models
 
     if lazy_loaded:
         return
     lazy_loaded = True
 
+    if ollama_import:
+        _ollama_models = sorted(model['name'] for model in ollama.list()['models'])
+
     if openai_import:
         _openai_models = sorted(model.id for model in list(openai_client.models.list()))
 
     if google_import:
-        _google_models = sorted(model.name.split('/')[1] for model in genai.list_models())
+        _google_models = sorted(model.name.split('/')[1] for model in genai.list_models() if 'generateContent' in model.supported_generation_methods)
 
     if anthropic_import:
         _anthropic_models = sorted([
@@ -93,6 +93,10 @@ def lazy_load():
             "claude-instant-1.1",
             "claude-instant-1.2",
         ])
+
+def ollama_models():
+    lazy_load()
+    return _ollama_models
 
 def openai_models():
     lazy_load()
@@ -120,16 +124,36 @@ if not all((llamapython_import, openai_import, google_import, anthropic_import))
     MODEL_ERR_MSG += " Note: Imports failed for: pip install " + " ".join(missing) + " ."
 
 
+@overload
 def generate(
     model: str|Llama, # type: ignore
     messages: list,
     temperature: float = 0.0,
-    json_object: bool = False,
-    json_schema: BaseModel|None = None,
+    json_output: bool = False,
+    structured_output_model: BaseModel|None = None,
+    stream: Literal[False] = False,
+) -> str: ...
+
+@overload
+def generate(
+    model: str|Llama, # type: ignore
+    messages: list,
+    temperature: float = 0.0,
+    json_output: bool = False,
+    structured_output_model: BaseModel|None = None,
+    stream: Literal[True] = True,
+) -> Generator[str, None, None]: ...
+
+def generate(
+    model: str|Llama, # type: ignore
+    messages: list,
+    temperature: float = 0.0,
+    json_output: bool = False,
+    structured_output_model: BaseModel|None = None,
     stream: bool = False,
 ) -> str | Generator[str, None, None]:
-    if json_object and json_schema:
-        raise ValueError("generate() cannot simultaneously support JSON mode (json_object) and Structured Object mode (json_schema)")
+    if json_output and structured_output_model:
+        raise ValueError("generate() cannot simultaneously support JSON mode (json_output) and Structured Output mode (structured_output_model)")
 
     func = None
 
@@ -151,7 +175,9 @@ def generate(
         model = model.split('/', maxsplit=1)[1]
         func = _anthropic
     else:
-        if model in openai_models():
+        if model in ollama_models():
+            func = _openai
+        elif model in openai_models():
             func = _openai
         elif model in google_models():
             func = _google
@@ -159,7 +185,7 @@ def generate(
             func = _anthropic
 
     if func:
-        return func(model, messages, temperature, json_object, json_schema, stream)
+        return func(model, messages, temperature, json_output, structured_output_model, stream)
     else:
         raise ValueError(MODEL_ERR_MSG.format(model=model))
 
@@ -167,17 +193,17 @@ def generate_stream(
     model: str|Llama, # type: ignore
     messages: list,
     temperature: float = 0.0,
-    json_object: bool = False,
-    json_schema: BaseModel|None = None,
+    json_output: bool = False,
+    structured_output_model: BaseModel|None = None,
 ) -> Generator[str, None, None]:
-    return generate(model, messages, temperature, json_object, json_schema, stream=True)
+    return generate(model, messages, temperature, json_output, structured_output_model, stream=True)
 
 def generate_tools(
     model: str|Llama, # type: ignore
     messages: list,
     temperature: float = 0.0,
     tools: list[Callable] = None,
-) -> list:
+) -> tuple[str, str, dict]:
     func = None
 
     if llamapython_import and isinstance(model, Llama):
@@ -198,7 +224,9 @@ def generate_tools(
         model = model.split('/', maxsplit=1)[1]
         func = _anthropic_tools
     else:
-        if model in openai_models():
+        if model in ollama_models():
+            func = _ollama_tools
+        elif model in openai_models():
             func = _openai_tools
         elif model in google_models():
             func = _google_tools
@@ -210,21 +238,21 @@ def generate_tools(
     else:
         raise ValueError(MODEL_ERR_MSG.format(model=model))
 
-def pydantic_to_schema(json_schema: BaseModel, indent: int|str|None = None) -> str:
-    return json.dumps(json_schema.model_json_schema(), indent=indent)
+def structured_output_model_to_schema(structured_output_model: BaseModel, indent: int|str|None = None) -> str:
+    return json.dumps(structured_output_model.model_json_schema(), indent=indent)
 
-def json_to_pydantic(json_response: str, pydantic_model: type[BaseModel]) -> BaseModel:
+def structured_output_to_object(structured_output: str, structured_output_model: type[BaseModel]) -> BaseModel:
     try:
-        data = json.loads(json_response)
-        instance = pydantic_model(**data)
+        data = json.loads(structured_output)
+        response_object = structured_output_model(**data)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON string: {e}")
     except ValueError as e:
         raise ValueError(f"Error creating Pydantic model: {e}")
 
-    return instance
+    return response_object
 
-def get_tool_func(tools: list[Callable], tool: str):
+def get_tool_func(tools: list[Callable], tool: str) -> Callable:
     for func in tools:
         if func.__name__ == tool:
             return func
@@ -256,8 +284,8 @@ def _llamapython(
     model: Llama, # type: ignore
     messages: list,
     temperature: float,
-    json_object: bool,
-    json_schema: BaseModel|None,
+    json_output: bool,
+    structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
     transformed_messages = _prepare_llamacpp_messages(messages)
@@ -269,10 +297,10 @@ def _llamapython(
         "max_tokens": -1,
     }
 
-    if json_object:
+    if json_output:
         kwargs["response_format"] = {"type": "json_object"}
-    if json_schema:
-        schema = pydantic_to_schema(json_schema)
+    if structured_output_model:
+        schema = structured_output_model_to_schema(structured_output_model)
         grammar = LlamaGrammar.from_json_schema(schema, verbose=False)
         kwargs["grammar"] = grammar
 
@@ -372,8 +400,8 @@ def _llamacpp(
     model: str,
     messages: list,
     temperature: float,
-    json_object: bool,
-    json_schema: BaseModel|None,
+    json_output: bool,
+    structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
     transformed_messages = _prepare_llamacpp_messages(messages)
@@ -385,10 +413,10 @@ def _llamacpp(
         "temperature": temperature,
     }
 
-    if json_object:
+    if json_output:
         kwargs["response_format"] = {"type": "json_object"}
-    if json_schema:
-        schema = pydantic_to_schema(json_schema)
+    if structured_output_model:
+        schema = structured_output_model_to_schema(structured_output_model)
         gbnf = json_schema_to_gbnf(schema)
         kwargs["extra_body"] = {"grammar": gbnf}
 
@@ -486,12 +514,12 @@ def _llamacpp_tools(
     return text, tool, args
 
 
-def _ollama(
+def _ollama_old(
     model: str,
     messages: list,
     temperature: float,
-    json_object: bool,
-    json_schema: BaseModel|None,
+    json_output: bool,
+    structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
     transformed_messages = _prepare_ollama_messages(messages)
@@ -503,9 +531,9 @@ def _ollama(
         "temperature": temperature,
     }
 
-    if json_object:
+    if json_output:
         kwargs["response_format"] = {"type": "json_object"}
-    if json_schema:
+    if structured_output_model:
         # TODO: Exception
         raise NotImplementedError("Ollama does not support Structured Output")
 
@@ -525,7 +553,7 @@ def _ollama(
         text = response.choices[0].message.content
         return text
 
-def _ollama_tools(
+def _ollama_tools_old(
     model: str,
     messages: list,
     temperature: float,
@@ -592,12 +620,12 @@ def _ollama_tools(
 
     return text, tool, args
 
-def _ollama2(
+def _ollama(
     model: str,
     messages: list,
     temperature: float,
-    json_object: bool,
-    json_schema: BaseModel|None,
+    json_output: bool,
+    structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
     transformed_messages = _prepare_ollama_messages(messages)
@@ -608,13 +636,14 @@ def _ollama2(
         "stream": stream,
         "options": {
             "temperature": temperature,
-            "num_ctx": 2048,
+            # "num_ctx": 2048,
         }
     }
 
-    if json_object:
+    if json_output:
         kwargs["format"] = "json"
-    if json_schema:
+    if structured_output_model:
+        # TODO: Exception
         raise NotImplementedError("Ollama does not support Structured Output")
 
     response = ollama.chat(**kwargs)
@@ -622,12 +651,77 @@ def _ollama2(
     if stream:
         def stream_generator():
             for chunk in response:
-                if chunk['message']['content']:
-                    yield chunk['message']['content']
+                yield chunk['message']['content']
         return stream_generator()
     else:
-        text = response.message.content
+        text = response['message']['content']
         return text
+
+def _ollama_tools(
+    model: str,
+    messages: list,
+    temperature: float,
+    tools: list[Callable],
+):
+    transformed_messages = _prepare_ollama_messages(messages)
+    transformed_tools = _prepare_openai_tools(tools) if tools else None
+
+    system_message = textwrap.dedent(f"""
+        You are a helpful assistant.
+        You have access to these tools:
+            {transformed_tools}
+
+        Always prefer a tool that can produce an answer if such a tool is available.
+
+        Otherwise try to answer it on your own to the best of your ability, i.e. just provide a
+        simple answer to the question, without elaborating.
+
+        Always create JSON output.
+        If the output requires a tool invocation, format the JSON in this way:
+            {{
+                "tool_name": "the_tool_name",
+                "arguments": {{ "arg1_name": arg1, "arg2_name": arg2, ... }}
+            }}
+        If the output does NOT require a tool invocation, format the JSON in this way:
+            {{
+                "tool_name": "",  # empty string for tool name
+                "result": response_to_the_query  # place the text response in a string here
+            }}
+    """).strip()
+
+    transformed_messages.insert(0, {"role": "system", "content": system_message})
+
+    kwargs = {
+        "model": model,
+        "messages": transformed_messages,
+        "stream": False,
+        "format": "json",
+        "options": {
+            "temperature": temperature,
+            # "num_ctx": 2048,
+        }
+    }
+
+    response = ollama.chat(**kwargs)
+
+    j = json.loads(response['message']['content'])
+
+    text = ''
+    tool = ''
+    args = {}
+
+    if 'tool_name' in j:
+        if j['tool_name'] and 'arguments' in j:
+            tool = j['tool_name']
+            args = j['arguments']
+        elif 'result' in j:
+            text = j['result']
+        else:
+            text = 'Did not produce a valid response.'
+    else:
+        text = 'Did not produce a valid response.'
+
+    return text, tool, args
 
 # https://github.com/ollama/ollama/blob/main/docs/api.md#parameters-1
 
@@ -636,8 +730,8 @@ def _openai(
     model: str,
     messages: list,
     temperature: float,
-    json_object: bool,
-    json_schema: BaseModel|None,
+    json_output: bool,
+    structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
     transformed_messages = _prepare_openai_messages(messages)
@@ -650,14 +744,14 @@ def _openai(
         "temperature": temperature,
     }
 
-    if json_object:
+    if json_output:
         kwargs["response_format"] = {"type": "json_object"}
-    if json_schema:
+    if structured_output_model:
         # Structured Output mode doesn't currently support streaming
         stream = False
         kwargs.pop("stream")
         # TODO: Warn
-        kwargs["response_format"] = json_schema
+        kwargs["response_format"] = structured_output_model
 
     if stream:
         def stream_generator():
@@ -668,7 +762,7 @@ def _openai(
                     yield text
         return stream_generator()
     else:
-        if json_schema:
+        if structured_output_model:
             response = openai_client.beta.chat.completions.parse(**kwargs)
             if (response.choices[0].message.refusal):
                 text = response.choices[0].message.refusal
@@ -729,8 +823,8 @@ def _google(
     model: str,
     messages: list,
     temperature: float,
-    json_object: bool,
-    json_schema: BaseModel|None,
+    json_output: bool,
+    structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
     system_message = _prepare_google_system_message(messages)
@@ -741,13 +835,13 @@ def _google(
         "max_output_tokens": 8192,
     }
 
-    if json_object or json_schema:
+    if json_output or structured_output_model:
         generation_config["response_mime_type"] = "application/json"
     else:
         generation_config["response_mime_type"] = "text/plain"
 
-    if json_schema:
-        generation_config["response_schema"] = json_schema
+    if structured_output_model:
+        generation_config["response_schema"] = structured_output_model
 
     gemini_model = genai.GenerativeModel(
         model_name=model,
@@ -848,8 +942,8 @@ def _anthropic(
     model: str,
     messages: list,
     temperature: float,
-    json_object: bool,
-    json_schema: BaseModel|None,
+    json_output: bool,
+    structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
     system_message = _prepare_anthropic_system_message(messages)
@@ -865,7 +959,7 @@ def _anthropic(
     if system_message:
         kwargs["system"] = system_message
 
-    if json_object:
+    if json_output:
         stream = False
         # TODO: Warn
         transformed_messages.append(
@@ -874,7 +968,7 @@ def _anthropic(
                 "content": "Here is the JSON requested:\n{"
             }
         )
-    if json_schema:
+    if structured_output_model:
         # TODO: Exception
         raise NotImplementedError("Anthropic does not support Structured Output")
 
@@ -888,7 +982,7 @@ def _anthropic(
         response = anthropic_client.messages.create(**kwargs)
 
         text = response.content[0].text
-        if json_object:
+        if json_output:
             text = '{' + text[:text.rfind("}") + 1]
             text = _extract_last_json(text)
 
@@ -930,28 +1024,46 @@ def _anthropic_tools(
 
     return text, tool, args
 
+# Message Roles:
+# LlamaCPP: Anything goes
+# Ollama: ['user', 'assistant', 'system', 'tool']
+# OpenAI: ['user', 'assistant', 'system', 'tool']
+# Google: ['user', 'model']
+# Anthropic: ['user', 'assistant']
+
+# Source:
+# https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
+# https://platform.openai.com/docs/api-reference/chat/create
+# https://ai.google.dev/api/caching?_gl=1*rgisf*_up*MQ..&gclid=Cj0KCQiArby5BhCDARIsAIJvjIQ-aoQzhR9K-Qanjy99zZ3ajEkoarOm3BkBMCKi4cjpajQ8XYaqvOMaAsW0EALw_wcB&gbraid=0AAAAACn9t64WTefkrGIeU_Xn4Wd9fULrQ#Content
+# https://docs.anthropic.com/en/api/messages
 
 def _prepare_llamacpp_messages(messages):
     messages_out = []
 
     for message in messages:
-        if 'content' in message and isinstance(message['content'], list):
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
+        role = message['role']
+
+        if isinstance(message['content'], str):
+            content = message['content']
+        elif isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'image_path':
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
+                    content.append({'type': 'text', 'text': item['text']})
+                elif item['type'] == 'image':
+                    ... # TODO: Exception
                     warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
-                    continue
-                elif item.get('type') == 'image_cv2':
-                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
-                    continue
-                elif item.get('type') == 'image_pil':
-                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
-                    continue
                 else:
-                    content.append(item)
+                    ... # TODO: Exception
         else:
-            content = message.get('content', '')
-        messages_out.append({'role': message['role'], 'content': content})
+            ... # TODO: Exception
+
+        messages_out.append({'role': role, 'content': content})
 
     return messages_out
 
@@ -959,23 +1071,36 @@ def _prepare_ollama_messages(messages):
     messages_out = []
 
     for message in messages:
-        if 'content' in message and isinstance(message['content'], list):
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
+        role = message['role']
+        content = []
+        images = []
+
+        if isinstance(message['content'], str):
+            content = message['content']
+        elif isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'image_path':
-                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
-                    continue
-                elif item.get('type') == 'image_cv2':
-                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
-                    continue
-                elif item.get('type') == 'image_pil':
-                    warnings.warn("PolyLLM does not yet support multi-modal input with LlamaCPP.")
-                    continue
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
+                    # content.append({'type': 'text', 'text': item['text']})
+                    content.append(item['text'])
+                elif item['type'] == 'image':
+                    image_data = _load_image(item['image'])
+                    images.append(image_data)
                 else:
-                    content.append(item) # TODO
+                    ... # TODO: Exception
+            content = '\n'.join(content) # TODO: Necessary?
         else:
-            content = message.get('content', '')
-        messages_out.append({'role': message['role'], 'content': content})
+            ... # TODO: Exception
+
+        if images: # TODO: If-statement necessary?
+            messages_out.append({'role': role, 'content': content, 'images': images})
+        else:
+            messages_out.append({'role': role, 'content': content})
 
     return messages_out
 
@@ -983,29 +1108,22 @@ def _prepare_openai_messages(messages):
     messages_out = []
 
     for message in messages:
-        if 'content' in message and isinstance(message['content'], list):
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
+        role = message['role']
+
+        if isinstance(message['content'], str):
+            content = message['content']
+        elif isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'image_path':
-                    image_data = _load_image_path(item['image_path'])
-                    base64_image = base64.b64encode(image_data).decode('utf-8')
-                    content.append({
-                        'type': 'image_url',
-                        'image_url': {
-                            'url': f"data:image/jpeg;base64,{base64_image}",
-                        },
-                    })
-                elif item.get('type') == 'image_cv2':
-                    image_data = _load_image_cv2(item['image_cv2'])
-                    base64_image = base64.b64encode(image_data).decode('utf-8')
-                    content.append({
-                        'type': 'image_url',
-                        'image_url': {
-                            'url': f"data:image/jpeg;base64,{base64_image}",
-                        },
-                    })
-                elif item.get('type') == 'image_pil':
-                    image_data = _load_image_pil(item['image_pil'])
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
+                    content.append({'type': 'text', 'text': item['text']})
+                elif item['type'] == 'image':
+                    image_data = _load_image(item['image'])
                     base64_image = base64.b64encode(image_data).decode('utf-8')
                     content.append({
                         'type': 'image_url',
@@ -1014,10 +1132,11 @@ def _prepare_openai_messages(messages):
                         },
                     })
                 else:
-                    content.append(item) # TODO
+                    ... # TODO: Exception
         else:
-            content = message.get('content', '')
-        messages_out.append({'role': message['role'], 'content': content})
+            ... # TODO: Exception
+
+        messages_out.append({'role': role, 'content': content})
 
     return messages_out
 
@@ -1048,31 +1167,33 @@ def _prepare_google_messages(messages):
     messages_out = []
 
     for message in messages:
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
         if message['role'] == 'system':
             continue
-        elif message['role'] == 'assistant':
+
+        if message['role'] == 'assistant':
             role = 'model'
         else:
             role = message['role']
 
-        if isinstance(message['content'], list):
+        if isinstance(message['content'], str):
+            content = [message['content']]
+        elif isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'text':
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
                     content.append(item['text'])
-                elif item.get('type') == 'image_path':
-                    image_data = _load_image_path(item['image_path'])
-                    content.append({'mime_type': 'image/jpeg', 'data': image_data})
-                elif item.get('type') == 'image_cv2':
-                    image_data = _load_image_cv2(item['image_cv2'])
-                    content.append({'mime_type': 'image/jpeg', 'data': image_data})
-                elif item.get('type') == 'image_pil':
-                    image_data = _load_image_pil(item['image_pil'])
+                elif item['type'] == 'image':
+                    image_data = _load_image(item['image'])
                     content.append({'mime_type': 'image/jpeg', 'data': image_data})
                 else:
-                    ... # TODO
+                    ... # TODO: Exception
         else:
-            content = [message['content']]
+            ... # TODO: Exception
 
         messages_out.append({'role': role, 'parts': content})
 
@@ -1092,53 +1213,40 @@ def _prepare_anthropic_messages(messages):
     messages_out = []
 
     for message in messages:
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
         if message['role'] == 'system':
             continue
 
-        if isinstance(message['content'], list):
+        role = message['role']
+
+        if isinstance(message['content'], str):
+            content = [{'type': 'text', 'text': message['content']}]
+        elif isinstance(message['content'], list):
             content = []
             for item in message['content']:
-                if item.get('type') == 'text':
-                    content.append({"type": "text", "text": item['text']})
-                elif item.get('type') == 'image_path':
-                    image_data = _load_image_path(item['image_path'])
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
+                    content.append({'type': 'text', 'text': item['text']})
+                elif item['type'] == 'image':
+                    image_data = _load_image(item['image'])
                     base64_image = base64.b64encode(image_data).decode('utf-8')
                     content.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": base64_image,
-                        },
-                    })
-                elif item.get('type') == 'image_cv2':
-                    image_data = _load_image_cv2(item['image_cv2'])
-                    base64_image = base64.b64encode(image_data).decode('utf-8')
-                    content.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": base64_image,
-                        },
-                    })
-                elif item.get('type') == 'image_pil':
-                    image_data = _load_image_pil(item['image_pil'])
-                    base64_image = base64.b64encode(image_data).decode('utf-8')
-                    content.append({
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": base64_image,
+                        'type': 'image',
+                        'source': {
+                            'type': 'base64',
+                            'media_type': 'image/jpeg',
+                            'data': base64_image,
                         },
                     })
                 else:
-                    ... # TODO
+                    ... # TODO: Exception
         else:
-            content = [{"type": "text", "text": message['content']}]
+            ... # TODO: Exception
 
-        messages_out.append({'role': message['role'], 'content': content})
+        messages_out.append({'role': role, 'content': content})
 
     return messages_out
 
@@ -1176,14 +1284,37 @@ def _load_image_path(image_path: str) -> bytes:
     with open(image_path, "rb") as image_file:
         return image_file.read()
 
-def _load_image_cv2(image: np.ndarray) -> bytes:
+def _load_image_cv2(image) -> bytes:
+    import cv2
     success, buffer = cv2.imencode('.jpg', image)
     if not success:
         raise ValueError("Failed to encode image")
     return buffer.tobytes()
 
-def _load_image_pil(image: Image.Image) -> bytes:
+def _load_image_pil(image) -> bytes:
     from io import BytesIO
     buffer = BytesIO()
     image.save(buffer, format='JPEG')
     return buffer.getvalue()
+
+def _load_image(image) -> bytes:
+    if isinstance(image, str):
+        return _load_image_path(image)
+
+    try:
+        import numpy as np
+    except ModuleNotFoundError:
+        pass
+    else:
+        if isinstance(image, np.ndarray):
+            return _load_image_cv2(image)
+
+    try:
+        from PIL import Image
+    except ModuleNotFoundError:
+        pass
+    else:
+        if isinstance(image, Image.Image):
+            return _load_image_pil(image)
+
+    ... # TODO: Exception

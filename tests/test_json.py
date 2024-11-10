@@ -25,7 +25,7 @@ def test_json(model):
         "years_served": "1789-1797",
     }
 
-    response = polyllm.generate(model, messages, json_object=True)
+    response = polyllm.generate(model, messages, json_output=True)
     assert isinstance(response, str)
     assert len(response) > 0
 
