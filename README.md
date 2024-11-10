@@ -104,8 +104,8 @@ python -m polyllm.demo \
 
 ### Model argument
 
-The `model` argument may provided as one of the following:
-- A instance of `llama_cpp.Llama`
+The `model` argument may be provided as one of the following:
+- An instance of `llama_cpp.Llama`
 - `'llamacpp/MODEL'`, where `MODEL` is either the port or ip:port of a running llama-cpp-python server (`python -m llama_cpp.server --n_gpu_layers -1 --model path/to/model.gguf`)
     - Treated as `f'http://localhost:{MODEL}/v1'` if `MODEL` DOES NOT contain a `:`.
     - Treated as `f'http://{MODEL}/v1'` if `MODEL` DOES contain a `:`.
@@ -181,7 +181,7 @@ Parse the output of a `generate(..., structured_output_model)` call into an inst
 import polyllm
 ```
 
-Run `python -m polyllm` to see the full list of known OpenAI, Google, and Anthropic models.
+Run `python -m polyllm` to see the full list of detected Ollama, OpenAI, Google, and Anthropic models.
 
 ### Basic Usage
 ```python
@@ -237,7 +237,7 @@ print(response)
 # This image depicts ...
 ```
 
-### Using Tools / Function Calling
+### Tools / Function Calling
 ```python
 def multiply_large_numbers(x: int, y: int) -> int:
     """Multiplies two large numbers."""
