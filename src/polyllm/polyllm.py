@@ -19,7 +19,12 @@ except ImportError:
 
 try:
     import ollama
-    ollama_import = True
+    try:
+        ollama.list()
+    except:  # noqa: E722
+        ollama_import = False
+    else:
+        ollama_import = True
 except ImportError:
     ollama_import = False
 
