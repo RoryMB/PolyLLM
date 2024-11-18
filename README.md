@@ -323,3 +323,27 @@ print(response_object.flights[0].destination)
 # Prints:
 # JFK
 ```
+
+### Langchain
+
+```python
+from polyllm.langchain import LCPolyLLM
+
+llm = LCPolyLLM(model="gpt-4")
+response = llm.invoke("What is your name?")
+print(response)
+
+# Prints:
+# As an artificial intelligence, I don't have a personal name. You can simply refer to me as OpenAI.
+
+from langchain_core.prompts import ChatPromptTemplate
+prompt = ChatPromptTemplate.from_messages(
+    [("system", "you are a bot"), ("human", "{input}")]
+)
+chain = prompt | llm
+response = chain.invoke(input="What are you?")
+print(response)
+
+# Prints:
+# Bot: I am an artificial intelligence assistant designed to help answer questions and provide information.
+```
