@@ -1,3 +1,4 @@
+import json
 from typing import Callable
 
 from pydantic import BaseModel
@@ -86,8 +87,14 @@ def _generate(
             }
         )
     if structured_output_model:
-        # TODO: Exception
-        raise NotImplementedError("Anthropic does not support Structured Output")
+        schema = structured_output_model.model_json_schema()
+        kwargs["tools"] = [{
+            "name": "format_response",
+            "description": "Format the response using a specific JSON schema",
+            "input_schema": schema
+        }]
+        kwargs["tool_choice"] = {"type": "tool", "name": "format_response"}
+        stream = False  # Disable streaming for structured output
 
     if stream:
         def stream_generator():
@@ -98,12 +105,16 @@ def _generate(
     else:
         response = anthropic_client.messages.create(**kwargs)
 
-        text = response.content[0].text
-        if json_output:
-            text = '{' + text[:text.rfind("}") + 1]
-            text = _extract_last_json(text)
-
-        return text
+        if structured_output_model and response.stop_reason == "tool_use":
+            # Extract structured output from tool response
+            text = response.content[1].input
+            return json.dumps(text)
+        else:
+            text = response.content[0].text
+            if json_output:
+                text = '{' + text[:text.rfind("}") + 1]
+                text = _extract_last_json(text)
+            return text
 
 def _generate_tools(
     model: str,
