@@ -1,9 +1,62 @@
 import json
-from typing import Callable
+from typing import Callable, Any
 
 from pydantic import BaseModel
 
 from ..polyllm import _extract_last_json
+
+def _transform_schema_for_anthropic(schema: dict[str, Any]) -> dict[str, Any]:
+    """Transform a Pydantic JSON schema into Anthropic's tool schema format."""
+    def _process_property(prop: dict[str, Any]) -> dict[str, Any]:
+        result = {}
+        
+        # Copy basic fields
+        if "type" in prop:
+            result["type"] = prop["type"]
+        if "description" in prop:
+            result["description"] = prop["description"]
+            
+        # Handle array types
+        if prop.get("type") == "array" and "items" in prop:
+            items = prop["items"]
+            if "$ref" in items:
+                ref_name = items["$ref"].split("/")[-1]
+                if ref_name in schema.get("$defs", {}):
+                    result["items"] = _process_property(schema["$defs"][ref_name])
+            else:
+                result["items"] = _process_property(items)
+                
+        # Handle object references
+        if "$ref" in prop:
+            ref_name = prop["$ref"].split("/")[-1]
+            if ref_name in schema.get("$defs", {}):
+                return _process_property(schema["$defs"][ref_name])
+                
+        # Handle nested objects
+        if prop.get("type") == "object":
+            result["type"] = "object"
+            if "properties" in prop:
+                result["properties"] = {
+                    k: _process_property(v) 
+                    for k, v in prop["properties"].items()
+                }
+            if "required" in prop:
+                result["required"] = prop["required"]
+                
+        return result
+
+    result = {
+        "type": "object",
+        "properties": {
+            k: _process_property(v)
+            for k, v in schema.get("properties", {}).items()
+        }
+    }
+    
+    if "required" in schema:
+        result["required"] = schema["required"]
+        
+    return result
 from .anthropic_msg import (
     _prepare_anthropic_messages,
     _prepare_anthropic_system_message,
@@ -87,7 +140,8 @@ def _generate(
             }
         )
     if structured_output_model:
-        schema = structured_output_model.model_json_schema()
+        raw_schema = structured_output_model.model_json_schema()
+        schema = _transform_schema_for_anthropic(raw_schema)
         kwargs["tools"] = [{
             "name": "format_response",
             "description": "Format the response using a specific JSON schema",
