@@ -27,6 +27,7 @@ Links:
 | Provider | Standard Chat | Image Input | JSON | Structured Output | Tool Usage |
 |----------|---------------|-------------|------|-------------------|------------|
 | llama.cpp | ✅ | 🔶 | ✅ | ✅ | ✅ |
+| MLX       | ✅ | 🟫 | ❌ | ❌ | ❌ |
 | Ollama    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Openai    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Google    | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -37,6 +38,7 @@ Links:
 | Provider | Plain Text | JSON | Structured Output | Tool Usage |
 |----------|------------|------|-------------------|------------|
 | llama.cpp | ✅ | ✅ | ✅ | 🟫 |
+| MLX       | ✅ | ❌ | ❌ | 🟫 |
 | Ollama    | ✅ | ✅ | ✅ | 🟫 |
 | Openai    | ✅ | ✅ | ❌ | 🟫 |
 | Google    | ✅ | ✅ | ✅ | 🟫 |

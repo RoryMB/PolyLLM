@@ -10,6 +10,7 @@ from .providers import (
     p_google,
     p_llamacpppython,
     p_llamacppserver,
+    p_mlx,
     p_ollama,
     p_openai,
 )
@@ -18,9 +19,9 @@ from .providers import (
 MODEL_ERR_MSG = "PolyLLM could not find model: {model}. Run `python -m polyllm` to see a list of known models."
 
 providers = {
-    # 'mlx': mlx_gen,
     'llamacpppython': p_llamacpppython,
     'llamacpp': p_llamacppserver,
+    'mlx': p_mlx,
     'ollama': p_ollama,
     'openai': p_openai,
     'google': p_google,
@@ -69,6 +70,8 @@ def generate(
     else:
         t_provider = model.split('/', maxsplit=1)[0]
         if t_provider in providers:
+            if not providers[t_provider].did_import:
+                raise ImportError(f"PolyLLM failed necessary imports for provider: {t_provider}.")
             func = providers[t_provider].generate
             model = model.split('/', maxsplit=1)[1]
         else:

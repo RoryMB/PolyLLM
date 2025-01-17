@@ -52,6 +52,7 @@ def test_multimodal_pil(model, test_image):
         pytest.skip("No test image configured")
 
     pil_image = Image.open(test_image)
+    pil_image.load()
     assert pil_image is not None, "Failed to load test image with PIL"
 
     messages = [

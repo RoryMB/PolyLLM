@@ -3,12 +3,16 @@ import os
 from typing import Generator
 from llama_cpp import Llama
 
+from huggingface_hub.utils import disable_progress_bars
+disable_progress_bars()
+
 # Test image path
 TEST_IMAGE = os.getenv("TEST_IMAGE", "")
 
 # Configure test models
 LLAMA_PYTHON_MODEL = os.getenv("TEST_LLAMA_PYTHON_MODEL", "")
 LLAMA_PYTHON_SERVER_PORT = os.getenv("TEST_LLAMA_PYTHON_SERVER_PORT", "")
+MLX_MODEL = os.getenv("TEST_MLX_MODEL", "")
 OLLAMA_MODEL = os.getenv("TEST_OLLAMA_MODEL", "")
 OPENAI_MODEL = os.getenv("TEST_OPENAI_MODEL", "")
 GOOGLE_MODEL = os.getenv("TEST_GOOGLE_MODEL", "")
@@ -36,6 +40,9 @@ def pytest_generate_tests(metafunc):
 
         if LLAMA_PYTHON_SERVER_PORT:
             models.append(LLAMA_PYTHON_SERVER_PORT)
+
+        if MLX_MODEL:
+            models.append(MLX_MODEL)
 
         if OLLAMA_MODEL:
             models.append(OLLAMA_MODEL)

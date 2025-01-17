@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polyllm"
-version = "1.0.2"
+version = "1.0.3"
 authors = [
     { name="Rory Butler" },
 ]
@@ -25,11 +25,12 @@ dependencies = [
 
 [project.optional-dependencies]
 all = [
-    "llama_cpp_python>=0.3.1",
-    "ollama>=0.3.3",
-    "openai>=1.47.0",
-    "google-generativeai>=0.5.4",
-    "anthropic>=0.34.2",
+    "llama-cpp-python>=0.3.6",
+    "mlx-lm>=0.21.1",
+    "ollama>=0.4.6",
+    "openai>=1.59.8",
+    "google-generativeai>=0.8.3",
+    "anthropic>=0.43.1",
 ]
 
 [project.urls]
