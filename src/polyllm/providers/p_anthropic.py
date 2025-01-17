@@ -1,67 +1,10 @@
+import base64
 import json
-from typing import Callable, Any
+from typing import Callable
 
 from pydantic import BaseModel
 
-from ..polyllm import _extract_last_json
-
-def _transform_schema_for_anthropic(schema: dict[str, Any]) -> dict[str, Any]:
-    """Transform a Pydantic JSON schema into Anthropic's tool schema format."""
-    def _process_property(prop: dict[str, Any]) -> dict[str, Any]:
-        result = {}
-        
-        # Copy basic fields
-        if "type" in prop:
-            result["type"] = prop["type"]
-        if "description" in prop:
-            result["description"] = prop["description"]
-            
-        # Handle array types
-        if prop.get("type") == "array" and "items" in prop:
-            items = prop["items"]
-            if "$ref" in items:
-                ref_name = items["$ref"].split("/")[-1]
-                if ref_name in schema.get("$defs", {}):
-                    result["items"] = _process_property(schema["$defs"][ref_name])
-            else:
-                result["items"] = _process_property(items)
-                
-        # Handle object references
-        if "$ref" in prop:
-            ref_name = prop["$ref"].split("/")[-1]
-            if ref_name in schema.get("$defs", {}):
-                return _process_property(schema["$defs"][ref_name])
-                
-        # Handle nested objects
-        if prop.get("type") == "object":
-            result["type"] = "object"
-            if "properties" in prop:
-                result["properties"] = {
-                    k: _process_property(v) 
-                    for k, v in prop["properties"].items()
-                }
-            if "required" in prop:
-                result["required"] = prop["required"]
-                
-        return result
-
-    result = {
-        "type": "object",
-        "properties": {
-            k: _process_property(v)
-            for k, v in schema.get("properties", {}).items()
-        }
-    }
-    
-    if "required" in schema:
-        result["required"] = schema["required"]
-        
-    return result
-from .anthropic_msg import (
-    _prepare_anthropic_messages,
-    _prepare_anthropic_system_message,
-    _prepare_anthropic_tools,
-)
+from ..utils import flatten_schema_dict, extract_last_json, load_image
 
 try:
     import anthropic
@@ -109,7 +52,9 @@ def lazy_load():
         "claude-instant-1.2",
     ])
 
-def _generate(
+# https://docs.anthropic.com/en/docs/build-with-claude/tool-use#json-mode
+
+def generate(
     model: str,
     messages: list,
     temperature: float,
@@ -117,13 +62,13 @@ def _generate(
     structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
-    system_message = _prepare_anthropic_system_message(messages)
-    transformed_messages = _prepare_anthropic_messages(messages)
+    system_message = prepare_system_message(messages)
+    transformed_messages = prepare_messages(messages)
 
     kwargs = {
         "model": model,
         "messages": transformed_messages,
-        "max_tokens": 4000,
+        "max_tokens": 8192 if '3-5' in model else 4096,
         "temperature": temperature,
     }
 
@@ -140,15 +85,16 @@ def _generate(
             }
         )
     if structured_output_model:
+        stream = False
+        # TODO: Warn
         raw_schema = structured_output_model.model_json_schema()
-        schema = _transform_schema_for_anthropic(raw_schema)
+        schema = flatten_schema_dict(raw_schema)
         kwargs["tools"] = [{
             "name": "format_response",
             "description": "Format the response using a specific JSON schema",
             "input_schema": schema
         }]
         kwargs["tool_choice"] = {"type": "tool", "name": "format_response"}
-        stream = False  # Disable streaming for structured output
 
     if stream:
         def stream_generator():
@@ -161,24 +107,28 @@ def _generate(
 
         if structured_output_model and response.stop_reason == "tool_use":
             # Extract structured output from tool response
-            text = response.content[1].input
-            return json.dumps(text)
+            for d in response.content:
+                if d.type == 'tool_use':
+                    text = d.input
+            # text = response.content[1].input
+            text = json.dumps(text)
         else:
             text = response.content[0].text
             if json_output:
                 text = '{' + text[:text.rfind("}") + 1]
-                text = _extract_last_json(text)
-            return text
+                text = extract_last_json(text)
 
-def _generate_tools(
+        return text
+
+def generate_tools(
     model: str,
     messages: list,
     temperature: float,
     tools: list[Callable],
 ):
-    system_message = _prepare_anthropic_system_message(messages)
-    transformed_messages = _prepare_anthropic_messages(messages)
-    transformed_tools = _prepare_anthropic_tools(tools) if tools else None
+    system_message = prepare_system_message(messages)
+    transformed_messages = prepare_messages(messages)
+    transformed_tools = prepare_tools(tools) if tools else None
 
     kwargs = {
         "model": model,
@@ -205,3 +155,74 @@ def _generate_tools(
         args = func.input
 
     return text, tool, args
+
+def prepare_messages(messages):
+    messages_out = []
+
+    for message in messages:
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
+        if message['role'] == 'system':
+            continue
+
+        role = message['role']
+
+        if isinstance(message['content'], str):
+            content = [{'type': 'text', 'text': message['content']}]
+        elif isinstance(message['content'], list):
+            content = []
+            for item in message['content']:
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
+                    content.append({'type': 'text', 'text': item['text']})
+                elif item['type'] == 'image':
+                    image_data = load_image(item['image'])
+                    base64_image = base64.b64encode(image_data).decode('utf-8')
+                    content.append({
+                        'type': 'image',
+                        'source': {
+                            'type': 'base64',
+                            'media_type': 'image/jpeg',
+                            'data': base64_image,
+                        },
+                    })
+                else:
+                    ... # TODO: Exception
+        else:
+            ... # TODO: Exception
+
+        messages_out.append({'role': role, 'content': content})
+
+    return messages_out
+
+def prepare_system_message(messages):
+    system_message = None
+
+    for message in messages:
+        if message['role'] == 'system':
+            system_message = message['content']
+            break
+
+    return system_message
+
+def prepare_tools(tools: list[Callable]):
+    anthropic_tools = []
+
+    for tool in tools:
+        anthropic_tools.append({
+            "name": tool.__name__,
+            "description": tool.__doc__,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    param: {"type": "number" if annotation == int else "string"}  # noqa: E721
+                    for param, annotation in tool.__annotations__.items()
+                    if param != 'return'
+                },
+                "required": list(tool.__annotations__.keys())[:-1]
+            }
+        })
+
+    return anthropic_tools

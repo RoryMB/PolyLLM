@@ -1,4 +1,5 @@
-from polyllm import polyllm
+import polyllm
+
 
 def test_streaming(model):
     """Test streaming capabilities across all models"""

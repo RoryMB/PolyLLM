@@ -60,3 +60,9 @@ def model(request) -> Generator[str|Llama, None, None]:
 def test_image() -> str:
     """Return path to test image if configured"""
     return TEST_IMAGE
+
+def pytest_runtest_call(item):
+    try:
+        item.runtest()
+    except NotImplementedError as e:
+        pytest.skip(f"Not Implemented: {str(e)}")

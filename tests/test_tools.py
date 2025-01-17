@@ -1,4 +1,5 @@
-from polyllm import polyllm
+import polyllm
+
 
 def multiply_large_numbers(a: int, b: int) -> int:
     """Multiplies two large numbers."""

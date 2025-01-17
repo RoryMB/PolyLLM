@@ -1,6 +1,7 @@
 import json
 import textwrap
-from polyllm import polyllm
+import polyllm
+
 
 def test_json(model):
     """Test JSON output mode across all models"""

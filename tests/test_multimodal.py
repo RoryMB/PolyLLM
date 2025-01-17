@@ -2,7 +2,8 @@ import pytest
 import cv2
 import numpy as np
 from PIL import Image
-from polyllm import polyllm
+import polyllm
+
 
 def test_multimodal_path(model, test_image):
     """Test multimodal capabilities with file path input"""

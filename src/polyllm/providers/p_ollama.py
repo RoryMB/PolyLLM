@@ -4,8 +4,7 @@ from typing import Callable
 
 from pydantic import BaseModel
 
-from .ollama_msg import _prepare_ollama_messages
-from .openai_msg import _prepare_openai_tools
+from ..utils import load_image
 
 try:
     import ollama
@@ -39,7 +38,7 @@ def lazy_load():
 
 # https://github.com/ollama/ollama/blob/main/docs/api.md#parameters-1
 
-def _generate(
+def generate(
     model: str,
     messages: list,
     temperature: float,
@@ -47,7 +46,7 @@ def _generate(
     structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
-    transformed_messages = _prepare_ollama_messages(messages)
+    transformed_messages = prepare_messages(messages)
 
     kwargs = {
         "model": model,
@@ -76,14 +75,14 @@ def _generate(
         text = response['message']['content']
         return text
 
-def _generate_tools(
+def generate_tools(
     model: str,
     messages: list,
     temperature: float,
     tools: list[Callable],
 ):
-    transformed_messages = _prepare_ollama_messages(messages)
-    transformed_tools = _prepare_openai_tools(tools) if tools else None
+    transformed_messages = prepare_messages(messages)
+    transformed_tools = prepare_tools(tools) if tools else None
 
     system_message = textwrap.dedent(f"""
         You are a helpful assistant.
@@ -141,3 +140,63 @@ def _generate_tools(
         text = 'Did not produce a valid response.'
 
     return text, tool, args
+
+def prepare_messages(messages):
+    messages_out = []
+
+    for message in messages:
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
+        role = message['role']
+        content = []
+        images = []
+
+        if isinstance(message['content'], str):
+            content = message['content']
+        elif isinstance(message['content'], list):
+            content = []
+            for item in message['content']:
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
+                    # content.append({'type': 'text', 'text': item['text']})
+                    content.append(item['text'])
+                elif item['type'] == 'image':
+                    image_data = load_image(item['image'])
+                    images.append(image_data)
+                else:
+                    ... # TODO: Exception
+            content = '\n'.join(content) # TODO: Necessary?
+        else:
+            ... # TODO: Exception
+
+        if images: # TODO: If-statement necessary?
+            messages_out.append({'role': role, 'content': content, 'images': images})
+        else:
+            messages_out.append({'role': role, 'content': content})
+
+    return messages_out
+
+def prepare_tools(tools: list[Callable]):
+    openai_tools = []
+
+    for tool in tools:
+        openai_tools.append({
+            "type": "function",
+            "function": {
+                "name": tool.__name__,
+                "description": tool.__doc__,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        param: {"type": "number" if annotation == int else "string"}  # noqa: E721
+                        for param, annotation in tool.__annotations__.items()
+                        if param != 'return'
+                    },
+                    "required": list(tool.__annotations__.keys())[:-1]
+                }
+            }
+        })
+
+    return openai_tools

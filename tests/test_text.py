@@ -1,4 +1,5 @@
-from polyllm import polyllm
+import polyllm
+
 
 def test_text(model):
     """Test basic text generation across all models, and correct handling of system, user, and assistant message roles"""

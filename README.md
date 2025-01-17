@@ -94,7 +94,7 @@ python -m polyllm.demo \
     --image-path /path/to/image.jpg \
     --llama-python-model /path/to/model.gguf \
     --llama-python-server-port 8000 \
-    --ollama-model llama3.1 \
+    --ollama-model llama3.2-vision \
     --openai-model gpt-4o \
     --google-model gemini-1.5-flash-latest \
     --anthropic-model claude-3-5-sonnet-latest

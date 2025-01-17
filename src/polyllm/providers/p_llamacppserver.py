@@ -5,9 +5,7 @@ from typing import Callable
 from openai import OpenAI
 from pydantic import BaseModel
 
-from ..polyllm import structured_output_model_to_schema
-from .llamapython_msg import _prepare_llamacpp_messages
-from .openai_msg import _prepare_openai_tools
+from ..utils import structured_output_model_to_schema
 
 try:
     from llama_cpp.llama_grammar import json_schema_to_gbnf
@@ -18,7 +16,7 @@ except ImportError:
 def get_models():
     return []
 
-def _generate(
+def generate(
     model: str,
     messages: list,
     temperature: float,
@@ -26,7 +24,7 @@ def _generate(
     structured_output_model: BaseModel|None,
     stream: bool = False,
 ):
-    transformed_messages = _prepare_llamacpp_messages(messages)
+    transformed_messages = prepare_messages(messages)
 
     kwargs = {
         "model": model,
@@ -63,14 +61,14 @@ def _generate(
         text = response.choices[0].message.content
         return text
 
-def _generate_tools(
+def generate_tools(
     model: str,
     messages: list,
     temperature: float,
     tools: list[Callable],
 ):
-    transformed_messages = _prepare_llamacpp_messages(messages)
-    transformed_tools = _prepare_openai_tools(tools) if tools else None
+    transformed_messages = prepare_messages(messages)
+    transformed_tools = prepare_tools(tools) if tools else None
 
     system_message = textwrap.dedent(f"""
         You are a helpful assistant.
@@ -134,3 +132,56 @@ def _generate_tools(
         text = 'Did not produce a valid response.'
 
     return text, tool, args
+
+def prepare_messages(messages):
+    messages_out = []
+
+    for message in messages:
+        assert 'role' in message # TODO: Explanation
+        assert 'content' in message # TODO: Explanation
+
+        role = message['role']
+
+        if isinstance(message['content'], str):
+            content = message['content']
+        elif isinstance(message['content'], list):
+            content = []
+            for item in message['content']:
+                assert 'type' in item # TODO: Explanation
+
+                if item['type'] == 'text':
+                    content.append({'type': 'text', 'text': item['text']})
+                elif item['type'] == 'image':
+                    ... # TODO: Exception
+                    raise NotImplementedError("PolyLLM does not yet support multi-modal input with LlamaCPP.")
+                else:
+                    ... # TODO: Exception
+        else:
+            ... # TODO: Exception
+
+        messages_out.append({'role': role, 'content': content})
+
+    return messages_out
+
+def prepare_tools(tools: list[Callable]):
+    openai_tools = []
+
+    for tool in tools:
+        openai_tools.append({
+            "type": "function",
+            "function": {
+                "name": tool.__name__,
+                "description": tool.__doc__,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        param: {"type": "number" if annotation == int else "string"}  # noqa: E721
+                        for param, annotation in tool.__annotations__.items()
+                        if param != 'return'
+                    },
+                    "required": list(tool.__annotations__.keys())[:-1]
+                }
+            }
+        })
+
+    return openai_tools

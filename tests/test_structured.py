@@ -1,6 +1,6 @@
 import textwrap
 from pydantic import BaseModel, Field
-from polyllm import polyllm
+import polyllm
 
 class Flight(BaseModel):
     departure_time: str = Field(description="The time the flight departs")

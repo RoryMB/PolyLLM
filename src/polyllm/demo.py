@@ -3,6 +3,7 @@ import textwrap
 import argparse
 import sys
 from . import polyllm
+from . import utils
 from pydantic import BaseModel, Field
 
 
@@ -39,21 +40,21 @@ ANTHROPIC_MODEL = args.anthropic_model or ''
 
 image_exists = os.path.isfile(IMAGE_PATH)
 
-if not polyllm.llamapython_import:
+if not polyllm.providers['llamacpppython'].did_import:
     print(red("Import for `llama_cpp_python` failed. Run `pip install -U polyllm[all]` or `pip install llama_cpp_python`"))
     LLAMA_PYTHON_MODEL = ''
     LLAMA_PYTHON_SERVER_PORT = ''
 # if not polyllm.ollama_import:
 #     print(red("Import for `ollama` failed. Run `pip install -U polyllm[all]` or `pip install ollama`"))
 #     OLLAMA_MODEL = '' # ALSO FIX THE ` OLLAMA_MODEL = ''` BELOW!!!!!!
-if not polyllm.openai_import:
+if not polyllm.providers['openai'].did_import:
     print(red("Import for `openai` failed. Run `pip install -U polyllm[all]` or `pip install openai`"))
     OPENAI_MODEL = ''
     OLLAMA_MODEL = ''
-if not polyllm.google_import:
+if not polyllm.providers['google'].did_import:
     print(red("Import for `google-generativeai` failed. Run `pip install -U polyllm[all]` or `pip install google-generativeai`"))
     GOOGLE_MODEL = ''
-if not polyllm.anthropic_import:
+if not polyllm.providers['anthropic'].did_import:
     print(red("Import for `anthropic` failed. Run `pip install -U polyllm[all]` or `pip install anthropic`"))
     ANTHROPIC_MODEL = ''
 
@@ -136,7 +137,7 @@ class Flight(BaseModel):
     destination: str = Field(description="The destination of the flight")
 class FlightList(BaseModel):
     flights: list[Flight] = Field(description="A list of known flight details")
-flight_list_schema = polyllm.structured_output_model_to_schema(FlightList, indent=2)
+flight_list_schema = utils.structured_output_model_to_schema(FlightList, indent=2)
 pydantic_messages = [
     {
         "role": "user",
@@ -181,7 +182,7 @@ if LLAMA_PYTHON_MODEL:
     print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
     output = polyllm.generate(llm, json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.structured_output_to_object(output, FlightList))
+    print(utils.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(llm, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -202,7 +203,7 @@ if LLAMA_PYTHON_SERVER_PORT:
     print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
     output = polyllm.generate(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.structured_output_to_object(output, FlightList))
+    print(utils.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(f"llamacpp/{LLAMA_PYTHON_SERVER_PORT}", tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -246,7 +247,7 @@ if OPENAI_MODEL:
     print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
     output = polyllm.generate(OPENAI_MODEL, json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.structured_output_to_object(output, FlightList))
+    print(utils.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(OPENAI_MODEL, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -271,7 +272,7 @@ if GOOGLE_MODEL:
     print(purple('\n(model="gemini-1.5-pro")'))
     output = polyllm.generate("gemini-1.5-pro", json_messages, structured_output_model=FlightList)
     print(output)
-    print(polyllm.structured_output_to_object(output, FlightList))
+    print(utils.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(GOOGLE_MODEL, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))
@@ -292,6 +293,10 @@ if ANTHROPIC_MODEL:
         print(polyllm.generate(ANTHROPIC_MODEL, image_messages))
     print(purple("\n==== Testing JSON mode `polyllm.generate(model, messages, json_output=True)`: (Should format: George, Washington, 1789-1797)"))
     print(polyllm.generate(ANTHROPIC_MODEL, json_messages, json_output=True))
+    print(purple("\n==== Testing Structured Output mode `polyllm.generate(model, messages, structured_output_model=PydanticModel)`: (Should list 2-5 random flight times and destinations)"))
+    output = polyllm.generate(ANTHROPIC_MODEL, json_messages, structured_output_model=FlightList)
+    print(output)
+    print(utils.structured_output_to_object(output, FlightList))
     print(purple("\n==== Testing tool usage `polyllm.generate(model, messages, tools=[func])`: (Should choose multiply_large_numbers, a=123456, b=654321)"))
     print(polyllm.generate_tools(ANTHROPIC_MODEL, tool_message0, tools=[multiply_large_numbers]))
     print(purple("\n==== Testing tool usage with no relevant tool `polyllm.generate(model, messages, tools=[func])`: (Should respond 57)"))

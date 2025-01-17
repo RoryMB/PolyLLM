@@ -1,31 +1,30 @@
-import json
+import functools
+import warnings
 from typing import Callable, Generator, Literal, overload
-from functools import deprecated
 
+from llama_cpp import Llama
 from pydantic import BaseModel
 
 from .providers import (
-    anthropic_gen,
-    google_gen,
-    llamacpp_gen,
-    llamapython_gen,
-    # mlx_gen,
-    ollama_gen,
-    openai_gen,
+    p_anthropic,
+    p_google,
+    p_llamacpppython,
+    p_llamacppserver,
+    p_ollama,
+    p_openai,
 )
 
-from llama_cpp import Llama
 
 MODEL_ERR_MSG = "PolyLLM could not find model: {model}. Run `python -m polyllm` to see a list of known models."
 
 providers = {
     # 'mlx': mlx_gen,
-    'llamapython': llamapython_gen,
-    'llamacpp': llamacpp_gen,
-    'ollama': ollama_gen,
-    'openai': openai_gen,
-    'google': google_gen,
-    'anthropic': anthropic_gen,
+    'llamacpppython': p_llamacpppython,
+    'llamacpp': p_llamacppserver,
+    'ollama': p_ollama,
+    'openai': p_openai,
+    'google': p_google,
+    'anthropic': p_anthropic,
 }
 
 # for plugin in get_plugins():
@@ -64,25 +63,37 @@ def generate(
 
     func = None
 
-    t_provider, t_model = model.split('/', maxsplit=1)[1]
 
-    if providers['llamapython'].did_import and isinstance(model, Llama):
-        func = providers['llamapython']._generate
-    elif t_provider in providers:
-        func = providers[t_provider]._generate
-        model = t_model
+    if providers['llamacpppython'].did_import and isinstance(model, Llama):
+        func = providers['llamacpppython'].generate
     else:
-        for provider in providers.values():
-            if model in provider.get_models():
-                func = provider._generate
-                break
+        t_provider = model.split('/', maxsplit=1)[0]
+        if t_provider in providers:
+            func = providers[t_provider].generate
+            model = model.split('/', maxsplit=1)[1]
+        else:
+            for provider in providers.values():
+                if model in provider.get_models():
+                    func = provider.generate
+                    break
 
     if not func:
         raise ValueError(MODEL_ERR_MSG.format(model=model))
 
     return func(model, messages, temperature, json_output, structured_output_model, stream)
 
-@deprecated(version='2.0.0', reason='Function `generate_stream()` will be removed in v2.0.0. Use `generate(..., stream=True)` instead')
+def deprecated(reason):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            warnings.warn(f"{func.__name__} is deprecated: {reason}",
+                        category=DeprecationWarning,
+                        stacklevel=2)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+@deprecated(reason='Function `generate_stream()` will be removed in v2.0.0. Use `generate(..., stream=True)` instead')
 def generate_stream(
     model: str|Llama, # type: ignore
     messages: list,
@@ -100,44 +111,24 @@ def generate_tools(
 ) -> tuple[str, str, dict]:
     func = None
 
-    t_provider, t_model = model.split('/', maxsplit=1)[1]
 
-    if providers['llamapython'].did_import and isinstance(model, Llama):
-        func = providers['llamapython']._generate_tools
-    elif t_provider in providers:
-        func = providers[t_provider]._generate_tools
-        model = t_model
+    if providers['llamacpppython'].did_import and isinstance(model, Llama):
+        func = providers['llamacpppython'].generate_tools
     else:
-        for provider in providers.values():
-            if model in provider.get_models():
-                func = provider._generate_tools
-                break
+        t_provider = model.split('/', maxsplit=1)[0]
+        if t_provider in providers:
+            func = providers[t_provider].generate_tools
+            model = model.split('/', maxsplit=1)[1]
+        else:
+            for provider in providers.values():
+                if model in provider.get_models():
+                    func = provider.generate_tools
+                    break
 
     if not func:
         raise ValueError(MODEL_ERR_MSG.format(model=model))
 
     return func(model, messages, temperature, tools)
-
-def structured_output_model_to_schema(structured_output_model: BaseModel, indent: int|str|None = None) -> str:
-    return json.dumps(structured_output_model.model_json_schema(), indent=indent)
-
-def structured_output_to_object(structured_output: str, structured_output_model: type[BaseModel]) -> BaseModel:
-    try:
-        data = json.loads(structured_output)
-        response_object = structured_output_model(**data)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON string: {e}")
-    except ValueError as e:
-        raise ValueError(f"Error creating Pydantic model: {e}")
-
-    return response_object
-
-def get_tool_func(tools: list[Callable], tool: str) -> Callable:
-    for func in tools:
-        if func.__name__ == tool:
-            return func
-
-    return None
 
 # Message Roles:
 # LlamaCPP: Anything goes
