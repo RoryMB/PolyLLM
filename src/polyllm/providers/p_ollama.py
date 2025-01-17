@@ -61,8 +61,7 @@ def generate(
     if json_output:
         kwargs["format"] = "json"
     if structured_output_model:
-        # TODO: Exception
-        raise NotImplementedError("Ollama does not support Structured Output")
+        kwargs['format'] = structured_output_model.model_json_schema()
 
     response = ollama.chat(**kwargs)
 

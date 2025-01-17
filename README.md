@@ -27,17 +27,17 @@ Links:
 | Provider | Standard Chat | Image Input | JSON | Structured Output | Tool Usage |
 |----------|---------------|-------------|------|-------------------|------------|
 | llama.cpp | ✅ | 🔶 | ✅ | ✅ | ✅ |
-| Ollama    | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Ollama    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Openai    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Google    | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Anthropic | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Anthropic | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 #### Streaming Output Modes
 
 | Provider | Plain Text | JSON | Structured Output | Tool Usage |
 |----------|------------|------|-------------------|------------|
 | llama.cpp | ✅ | ✅ | ✅ | 🟫 |
-| Ollama    | ✅ | ✅ | ❌ | 🟫 |
+| Ollama    | ✅ | ✅ | ✅ | 🟫 |
 | Openai    | ✅ | ✅ | ❌ | 🟫 |
 | Google    | ✅ | ✅ | ✅ | 🟫 |
 | Anthropic | ✅ | 🟫 | ❌ | 🟫 |
@@ -289,8 +289,6 @@ print(json.loads(response))
 ```
 
 ### Structured Output
-> [!WARNING]
-> Not supported by Ollama or Anthropic.
 ```python
 from pydantic import BaseModel, Field
 
