@@ -47,7 +47,7 @@ class LCPolyLLM(LLM):
             The generated text
         """
         if stop is not None:
-            raise ValueError("Stop sequences are not supported with PolyLLM")
+            raise RuntimeError("Stop sequences are not supported with PolyLLM")
 
         messages = [{"role": "user", "content": prompt}]
         return generate(

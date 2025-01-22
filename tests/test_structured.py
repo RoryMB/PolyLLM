@@ -11,7 +11,7 @@ class FlightList(BaseModel):
 
 def test_structured(model):
     """Test structured output using Pydantic models"""
-    flight_list_schema = polyllm.structured_output_model_to_schema(FlightList, indent=2)
+    flight_list_schema = polyllm.utils.structured_output_model_to_schema(FlightList, indent=2)
     messages = [
         {
             "role": "user",
@@ -27,4 +27,4 @@ def test_structured(model):
     assert len(response) > 0
 
     # Verify we can parse it into our Pydantic model
-    polyllm.structured_output_to_object(response, FlightList)
+    polyllm.utils.structured_output_to_object(response, FlightList)

@@ -86,9 +86,9 @@ def structured_output_to_object(structured_output: str, structured_output_model:
         data = json.loads(structured_output)
         response_object = structured_output_model(**data)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON string: {e}")
+        raise RuntimeError(f"Invalid JSON string: {e}")
     except ValueError as e:
-        raise ValueError(f"Error creating Pydantic model: {e}")
+        raise RuntimeError(f"Error creating Pydantic model: {e}")
 
     return response_object
 
@@ -107,7 +107,7 @@ def load_image_cv2(image) -> bytes:
     import cv2
     success, buffer = cv2.imencode('.jpg', image)
     if not success:
-        raise ValueError("Failed to encode image")
+        raise RuntimeError("Failed to encode image")
     return buffer.tobytes()
 
 def load_image_pil(image) -> bytes:

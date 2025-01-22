@@ -1,7 +1,12 @@
-import pytest
 import os
 from typing import Generator
+
+import pytest
 from llama_cpp import Llama
+import mlx.nn
+from mlx_lm.tokenizer_utils import TokenizerWrapper
+
+import polyllm
 
 from huggingface_hub.utils import disable_progress_bars
 disable_progress_bars()
@@ -19,30 +24,28 @@ GOOGLE_MODEL = os.getenv("TEST_GOOGLE_MODEL", "")
 ANTHROPIC_MODEL = os.getenv("TEST_ANTHROPIC_MODEL", "")
 
 def get_model_name(model):
-    if isinstance(model, str):
-        return model
-    if isinstance(model, Llama):
-        return model.model_path.split('/')[-1]
-    return str(model)
+    match model:
+        case Llama() if polyllm.providers['llamacpppython'].did_import:
+            return model.model_path.split('/')[-1]
+        case (mlx.nn.Module(), TokenizerWrapper()) if polyllm.providers['mlx'].did_import:
+            return 'mlx:' + model[0].model_type
+        case str():
+            return model
+        case _:
+            return str(model)
 
 def pytest_generate_tests(metafunc):
     if "model" in metafunc.fixturenames:
         models = []
 
         if LLAMA_PYTHON_MODEL:
-            llm = Llama(
-                model_path=LLAMA_PYTHON_MODEL,
-                n_ctx=1024,
-                n_gpu_layers=-1,
-                verbose=False,
-            )
-            models.append(llm)
+            models.append(polyllm.load_helpers.load_llama(LLAMA_PYTHON_MODEL))
 
         if LLAMA_PYTHON_SERVER_PORT:
             models.append(LLAMA_PYTHON_SERVER_PORT)
 
         if MLX_MODEL:
-            models.append(MLX_MODEL)
+            models.append(polyllm.load_helpers.load_mlx(MLX_MODEL))
 
         if OLLAMA_MODEL:
             models.append(OLLAMA_MODEL)

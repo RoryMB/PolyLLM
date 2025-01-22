@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polyllm"
-version = "1.0.3"
+version = "1.0.4"
 authors = [
     { name="Rory Butler" },
 ]
 description = "A unified interface for querying multiple large language models"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

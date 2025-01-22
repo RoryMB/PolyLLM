@@ -3,8 +3,10 @@ from typing import Callable
 from pydantic import BaseModel
 
 try:
+    import mlx.nn
     import mlx_lm
     from mlx_lm.sample_utils import make_sampler
+    from mlx_lm.tokenizer_utils import TokenizerWrapper
     did_import = True
 except ImportError:
     did_import = False
@@ -15,7 +17,7 @@ def get_models():
     return _models
 
 def generate(
-    model: str,
+    model: tuple[mlx.nn.Module, TokenizerWrapper],
     messages: list,
     temperature: float,
     json_output: bool,
@@ -24,12 +26,12 @@ def generate(
 ):
     transformed_messages = prepare_messages(messages)
 
-    model, tokenizer = mlx_lm.load(model)
+    model_instance, tokenizer = model
     prompt = tokenizer.apply_chat_template(transformed_messages, tokenize=False, add_generation_prompt=True)
     sampler = make_sampler(temp=temperature)
 
     kwargs = {
-        "model": model,
+        "model": model_instance,
         "tokenizer": tokenizer,
         "prompt": prompt,
         "max_tokens": 8192,
@@ -49,7 +51,7 @@ def generate(
         return text
 
 def generate_tools(
-    model: str,
+    model: tuple[mlx.nn.Module, TokenizerWrapper],
     messages: list,
     temperature: float,
     tools: list[Callable],
@@ -69,20 +71,13 @@ def prepare_messages(messages):
         if isinstance(message['content'], str):
             content = message['content']
         elif isinstance(message['content'], list):
-            content = []
             for item in message['content']:
-                assert 'type' in item # TODO: Explanation
-
-                if item['type'] == 'text':
-                    content.append({'type': 'text', 'text': item['text']})
-                elif item['type'] == 'image':
+                if item.get('type') == 'image':
                     # image_data = load_image(item['image'])
                     # content.append({'type': 'image', 'image': image_data})
                     raise NotImplementedError("PolyLLM does not yet support images with MLX.")
-                else:
-                    ... # TODO: Exception
         else:
-            ... # TODO: Exception
+            ... # TODO: Exception?
 
         messages_out.append({'role': role, 'content': content})
 

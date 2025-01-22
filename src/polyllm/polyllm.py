@@ -1,8 +1,7 @@
 import functools
 import warnings
-from typing import Callable, Generator, Literal, overload
+from typing import Callable, Generator, Literal, Union, overload
 
-from llama_cpp import Llama
 from pydantic import BaseModel
 
 from .providers import (
@@ -15,8 +14,16 @@ from .providers import (
     p_openai,
 )
 
+try:
+    from llama_cpp import Llama
+except ImportError:
+    pass
 
-MODEL_ERR_MSG = "PolyLLM could not find model: {model}. Run `python -m polyllm` to see a list of known models."
+try:
+    import mlx.nn
+    from mlx_lm.tokenizer_utils import TokenizerWrapper
+except ImportError:
+    pass
 
 providers = {
     'llamacpppython': p_llamacpppython,
@@ -33,7 +40,7 @@ providers = {
 
 @overload
 def generate(
-    model: str|Llama, # type: ignore
+    model: Union[str, "Llama", tuple["mlx.nn.Module", "TokenizerWrapper"]],
     messages: list,
     temperature: float = 0.0,
     json_output: bool = False,
@@ -43,7 +50,7 @@ def generate(
 
 @overload
 def generate(
-    model: str|Llama, # type: ignore
+    model: Union[str, "Llama", tuple["mlx.nn.Module", "TokenizerWrapper"]],
     messages: list,
     temperature: float = 0.0,
     json_output: bool = False,
@@ -52,7 +59,7 @@ def generate(
 ) -> Generator[str, None, None]: ...
 
 def generate(
-    model: str|Llama, # type: ignore
+    model: Union[str, "Llama", tuple["mlx.nn.Module", "TokenizerWrapper"]],
     messages: list,
     temperature: float = 0.0,
     json_output: bool = False,
@@ -60,28 +67,30 @@ def generate(
     stream: bool = False,
 ) -> str | Generator[str, None, None]:
     if json_output and structured_output_model:
-        raise ValueError("generate() cannot simultaneously support JSON mode (json_output) and Structured Output mode (structured_output_model)")
+        raise RuntimeError("generate() cannot simultaneously support JSON mode (json_output) and Structured Output mode (structured_output_model)")
 
-    func = None
-
-
-    if providers['llamacpppython'].did_import and isinstance(model, Llama):
-        func = providers['llamacpppython'].generate
-    else:
-        t_provider = model.split('/', maxsplit=1)[0]
-        if t_provider in providers:
-            if not providers[t_provider].did_import:
-                raise ImportError(f"PolyLLM failed necessary imports for provider: {t_provider}.")
-            func = providers[t_provider].generate
-            model = model.split('/', maxsplit=1)[1]
-        else:
-            for provider in providers.values():
-                if model in provider.get_models():
-                    func = provider.generate
-                    break
-
-    if not func:
-        raise ValueError(MODEL_ERR_MSG.format(model=model))
+    match model:
+        case Llama() if providers['llamacpppython'].did_import:
+            func = providers['llamacpppython'].generate
+        case (mlx.nn.Module(), TokenizerWrapper()) if providers['mlx'].did_import:
+            func = providers['mlx'].generate
+        case str():
+            if '/' in model:
+                provider, model = model.split('/', maxsplit=1)
+                if provider not in providers:
+                    raise RuntimeError(f"PolyLLM could not find provider: {provider}.")
+                if not providers[provider].did_import:
+                    raise ImportError(f"PolyLLM failed necessary imports for provider: {provider}.")
+                func = providers[provider].generate
+            else:
+                for provider in providers.values():
+                    if model in provider.get_models():
+                        func = provider.generate
+                        break
+                else:
+                    raise RuntimeError(f"PolyLLM could not find model: {model}. Run `python -m polyllm` to see a list of known models.")
+        case _:
+            raise RuntimeError(f"Unexpected model type: {type(model)}. PolyLLM expects a string, llama_cpp.Llama object, or (mlx.nn.Module, mlx_lm.tokenizer_utils.TokenizerWrapper) tuple.")
 
     return func(model, messages, temperature, json_output, structured_output_model, stream)
 
@@ -98,7 +107,7 @@ def deprecated(reason):
 
 @deprecated(reason='Function `generate_stream()` will be removed in v2.0.0. Use `generate(..., stream=True)` instead')
 def generate_stream(
-    model: str|Llama, # type: ignore
+    model: Union[str, "Llama", tuple["mlx.nn.Module", "TokenizerWrapper"]],
     messages: list,
     temperature: float = 0.0,
     json_output: bool = False,
@@ -107,29 +116,33 @@ def generate_stream(
     return generate(model, messages, temperature, json_output, structured_output_model, stream=True)
 
 def generate_tools(
-    model: str|Llama, # type: ignore
+    model: Union[str, "Llama", tuple["mlx.nn.Module", "TokenizerWrapper"]],
     messages: list,
     temperature: float = 0.0,
     tools: list[Callable] = None,
 ) -> tuple[str, str, dict]:
-    func = None
-
-
-    if providers['llamacpppython'].did_import and isinstance(model, Llama):
-        func = providers['llamacpppython'].generate_tools
-    else:
-        t_provider = model.split('/', maxsplit=1)[0]
-        if t_provider in providers:
-            func = providers[t_provider].generate_tools
-            model = model.split('/', maxsplit=1)[1]
-        else:
-            for provider in providers.values():
-                if model in provider.get_models():
-                    func = provider.generate_tools
-                    break
-
-    if not func:
-        raise ValueError(MODEL_ERR_MSG.format(model=model))
+    match model:
+        case Llama() if providers['llamacpppython'].did_import:
+            func = providers['llamacpppython'].generate_tools
+        case (mlx.nn.Module(), TokenizerWrapper()) if providers['mlx'].did_import:
+            func = providers['mlx'].generate_tools
+        case str():
+            if '/' in model:
+                provider, model = model.split('/', maxsplit=1)
+                if provider not in providers:
+                    raise RuntimeError(f"PolyLLM could not find provider: {provider}.")
+                if not providers[provider].did_import:
+                    raise ImportError(f"PolyLLM failed necessary imports for provider: {provider}.")
+                func = providers[provider].generate_tools
+            else:
+                for provider in providers.values():
+                    if model in provider.get_models():
+                        func = provider.generate_tools
+                        break
+                else:
+                    raise RuntimeError(f"PolyLLM could not find model: {model}. Run `python -m polyllm` to see a list of known models.")
+        case _:
+            raise RuntimeError(f"Unexpected model type: {type(model)}. PolyLLM expects a string, llama_cpp.Llama object, or (mlx.nn.Module, mlx_lm.tokenizer_utils.TokenizerWrapper) tuple.")
 
     return func(model, messages, temperature, tools)
 

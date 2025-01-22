@@ -34,7 +34,7 @@ def lazy_load():
     if not did_import:
         return
 
-    _models = sorted(model['name'] for model in ollama.list()['models'])
+    _models = sorted(model.model for model in ollama.list()['models'])
 
 # https://github.com/ollama/ollama/blob/main/docs/api.md#parameters-1
 
