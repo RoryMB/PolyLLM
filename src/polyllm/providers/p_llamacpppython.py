@@ -8,6 +8,7 @@ from ..utils import structured_output_model_to_schema
 
 try:
     from llama_cpp import Llama, LlamaGrammar
+    from llama_cpp.llama_grammar import json_schema_to_gbnf
     did_import = True
 except ImportError:
     did_import = False
@@ -36,7 +37,7 @@ def generate(
         kwargs["response_format"] = {"type": "json_object"}
     if structured_output_model:
         schema = structured_output_model_to_schema(structured_output_model)
-        grammar = LlamaGrammar.from_json_schema(schema, verbose=False)
+        grammar = LlamaGrammar.from_string(json_schema_to_gbnf(schema), verbose=False)
         kwargs["grammar"] = grammar
 
     response = model.create_chat_completion(**kwargs)

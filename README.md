@@ -27,7 +27,7 @@ Links:
 | Provider | Standard Chat | Image Input | JSON | Structured Output | Tool Usage |
 |----------|---------------|-------------|------|-------------------|------------|
 | llama.cpp | ✅ | 🔶 | ✅ | ✅ | ✅ |
-| MLX       | ✅ | 🟫 | ❌ | ❌ | ❌ |
+| MLX       | ✅ | 🟫 | 🚧 | 🚧 | 🚧 |
 | Ollama    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Openai    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Google    | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -38,7 +38,7 @@ Links:
 | Provider | Plain Text | JSON | Structured Output | Tool Usage |
 |----------|------------|------|-------------------|------------|
 | llama.cpp | ✅ | ✅ | ✅ | 🟫 |
-| MLX       | ✅ | ❌ | ❌ | 🟫 |
+| MLX       | ✅ | 🚧 | 🚧 | 🟫 |
 | Ollama    | ✅ | ✅ | ✅ | 🟫 |
 | Openai    | ✅ | ✅ | ❌ | 🟫 |
 | Google    | ✅ | ✅ | ✅ | 🟫 |
@@ -52,6 +52,12 @@ Links:
 
 🟫: Support not planned
 
+> [!WARNING]
+> 🚧: MLX support for structuring techniques is not part of the official mlx_lm module.
+>
+> A modified version of [this GBNF package](https://github.com/ambient-labs/GBNF) is included here to support some interim capabilities.
+>
+> These features are experimental and will be buggy and slow!
 
 ## Installation
 
@@ -215,19 +221,20 @@ print()
 
 ### Multimodal (Image Input)
 ```python
-messages = [{
-    "role": "user",
-    "content": [
-        {"type": "text", "text": "What's in this image?"},
-        {"type": "image", "image": "/path/to/image"},
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "What's in this image?"},
+            {"type": "image", "image": "/path/to/image"},
 
-        # These also work if you have the image as
-        # an np.array / PIL Image instead of on disk:
-
-        # {"type": "image", "image": cv2.imread("/path/to/image")},
-        # {"type": "image", "image": Image.open("/path/to/image")},
-    ],
-}]
+            # These also work if you have the image as
+            # an np.array / PIL Image instead of on disk:
+            # {"type": "image", "image": cv2.imread("/path/to/image")},
+            # {"type": "image", "image": Image.open("/path/to/image")},
+        ],
+    },
+]
 
 response = polyllm.generate(
     model="ollama/llama3.2-vision",
@@ -306,10 +313,12 @@ flight_list_schema = polyllm.structured_output_model_to_schema(FlightList, inden
 
 response = polyllm.generate(
     model="gemini-1.5-pro-latest",
-    messages=[{
-        "role": "user",
-        "content": f"Write a list of 2 to 5 random flight details.\nProduce the result in JSON that matches this schema:\n{flight_list_schema}",
-    }],
+    messages=[
+        {
+            "role": "user",
+            "content": f"Write a list of 2 to 5 random flight details.\nProduce the result in JSON that matches this schema:\n{flight_list_schema}",
+        },
+    ],
     structured_output_model=FlightList,
 )
 print(response)

@@ -62,11 +62,6 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("model", models, ids=[get_model_name(model) for model in models])
 
 @pytest.fixture
-def model(request) -> Generator[str|Llama, None, None]:
-    """Return a single configured test model"""
-    yield request.param
-
-@pytest.fixture
 def test_image() -> str:
     """Return path to test image if configured"""
     return TEST_IMAGE
