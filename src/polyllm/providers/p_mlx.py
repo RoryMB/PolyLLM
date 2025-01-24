@@ -60,8 +60,7 @@ def generate(
         stream_generator = mlx_lm.stream_generate(**kwargs)
         return (t.text for t in stream_generator)
     else:
-        text = mlx_lm.generate(**kwargs)
-        return text
+        return mlx_lm.generate(**kwargs)
 
 def generate_tools(
     model: tuple[mlx.nn.Module, TokenizerWrapper],

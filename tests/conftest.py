@@ -19,6 +19,7 @@ LLAMA_PYTHON_MODEL = os.getenv("TEST_LLAMA_PYTHON_MODEL", "")
 LLAMA_PYTHON_SERVER_PORT = os.getenv("TEST_LLAMA_PYTHON_SERVER_PORT", "")
 MLX_MODEL = os.getenv("TEST_MLX_MODEL", "")
 OLLAMA_MODEL = os.getenv("TEST_OLLAMA_MODEL", "")
+LITELLM_MODEL = os.getenv("TEST_LITELLM_MODEL", "")
 OPENAI_MODEL = os.getenv("TEST_OPENAI_MODEL", "")
 GOOGLE_MODEL = os.getenv("TEST_GOOGLE_MODEL", "")
 ANTHROPIC_MODEL = os.getenv("TEST_ANTHROPIC_MODEL", "")
@@ -50,6 +51,9 @@ def pytest_generate_tests(metafunc):
         if OLLAMA_MODEL:
             models.append(OLLAMA_MODEL)
 
+        if LITELLM_MODEL:
+            models.append(LITELLM_MODEL)
+
         if OPENAI_MODEL:
             models.append(OPENAI_MODEL)
 
@@ -58,6 +62,8 @@ def pytest_generate_tests(metafunc):
 
         if ANTHROPIC_MODEL:
             models.append(ANTHROPIC_MODEL)
+
+        assert models, "You must set at least 1 model to test."
 
         metafunc.parametrize("model", models, ids=[get_model_name(model) for model in models])
 

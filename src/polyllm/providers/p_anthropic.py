@@ -208,16 +208,16 @@ def prepare_system_message(messages):
     return system_message
 
 def prepare_tools(tools: list[Callable]):
-    anthropic_tools = []
+    tools_out = []
 
     for tool in tools:
-        anthropic_tools.append({
+        tools_out.append({
             "name": tool.__name__,
             "description": tool.__doc__,
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    param: {"type": "number" if annotation == int else "string"}  # noqa: E721
+                    param: {"type": "number" if annotation is int else "string"}
                     for param, annotation in tool.__annotations__.items()
                     if param != 'return'
                 },
@@ -225,4 +225,4 @@ def prepare_tools(tools: list[Callable]):
             }
         })
 
-    return anthropic_tools
+    return tools_out

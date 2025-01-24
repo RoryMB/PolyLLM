@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from .providers import (
     p_anthropic,
     p_google,
+    p_litellm,
     p_llamacpppython,
     p_llamacppserver,
     p_mlx,
@@ -30,6 +31,7 @@ providers = {
     'llamacpp': p_llamacppserver,
     'mlx': p_mlx,
     'ollama': p_ollama,
+    'litellm': p_litellm,
     'openai': p_openai,
     'google': p_google,
     'anthropic': p_anthropic,

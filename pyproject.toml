@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polyllm"
-version = "1.0.4"
+version = "1.0.5"
 authors = [
     { name="Rory Butler" },
 ]
@@ -19,18 +19,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "backoff>=2.2.1",
-    "pydantic>=2.9.2",
+    "backoff",
+    "pydantic",
 ]
 
 [project.optional-dependencies]
 all = [
-    "llama-cpp-python>=0.3.6",
-    "mlx-lm>=0.21.1",
-    "ollama>=0.4.6",
-    "openai>=1.59.8",
-    "google-generativeai>=0.8.3",
-    "anthropic>=0.43.1",
+    "llama-cpp-python",
+    "mlx-lm",
+    "ollama",
+    "openai",
+    "google-generativeai",
+    "anthropic",
+    "litellm",
 ]
 
 [project.urls]
@@ -39,3 +40,10 @@ all = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "opencv-contrib-python",
+    "pillow",
+    "pytest",
+]

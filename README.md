@@ -80,10 +80,12 @@ pip install polyllm[all] # Gets all optional provider dependencies
   - `pillow`
 - Optional dependencies based on which LLM providers you want to use:
   - `llama-cpp-python`
+  - `mlx-lm`
   - `ollama`
   - `openai`
   - `google-generativeai`
   - `anthropic`
+  - `litellm`
 
 ## Configuration
 
@@ -114,6 +116,10 @@ python -m polyllm.demo \
 
 The `model` argument may be provided as one of the following:
 - An instance of `llama_cpp.Llama`
+    - Helper function `model = polyllm.load_helpers.load_llama("path/to/model.gguf")`
+- A 2-tuple containing instances of `mlx.nn.Module` and `TokenizerWrapper`
+    - Helper function `model = polyllm.load_helpers.load_mlx("mlx-community/model-name-here", auto_download=True)`
+    - Also accepts a path to a local directory for self-managed downloads
 - `'llamacpp/MODEL'`, where `MODEL` is either the port or ip:port of a running llama-cpp-python server (`python -m llama_cpp.server --n_gpu_layers -1 --model path/to/model.gguf`)
     - Treated as `f'http://localhost:{MODEL}/v1'` if `MODEL` DOES NOT contain a `:`.
     - Treated as `f'http://{MODEL}/v1'` if `MODEL` DOES contain a `:`.
@@ -121,9 +127,9 @@ The `model` argument may be provided as one of the following:
 - `'openai/MODEL_NAME'`
 - `'google/MODEL_NAME'`
 - `'anthropic/MODEL_NAME'`
-- `'MODEL_NAME'`, where `MODEL_NAME` is one of the models printed by `python -m polyllm`
-    - Allows you to simply write `gpt-4` instead of `openai/gpt-4`.
-    - May be somewhat less reliable, so prefer using the `provider/MODEL_NAME` syntax.
+- `'litellm/PROVIDER/MODEL_NAME'`
+    - LiteLLM will replace the OpenAI, Google, and Anthropic backends in a future update.
+    - At that point, you will no longer need to use `'litellm'` at the start of the string.
 
 ### Avaliable Functions
 
@@ -194,7 +200,7 @@ Run `python -m polyllm` to see the full list of detected Ollama, OpenAI, Google,
 ### Basic Usage
 ```python
 response = polyllm.generate(
-    model="gpt-3.5-turbo",
+    model="openai/gpt-3.5-turbo",
     messages=[{"role": "user", "content": "Hello, how are you?"}],
     temperature=0.2,
 )
@@ -207,7 +213,7 @@ print(response)
 ### Streaming Response
 ```python
 for chunk in polyllm.generate(
-    model="gpt-4",
+    model="openai/gpt-4",
     messages=[{"role": "user", "content": "Tell me a story"}],
     temperature=0.7,
     stream=True,
@@ -255,7 +261,7 @@ def multiply_large_numbers(x: int, y: int) -> int:
 
 tools = [multiply_large_numbers]
 response, tool, args = polyllm.generate_tools(
-    model="gemini-1.5-pro-latest",
+    model="google/gemini-1.5-pro-latest",
     messages=[{"role": "user", "content": "What is 123456 multiplied by 654321?"}],
     tools=tools,
 )
@@ -275,7 +281,7 @@ else:
 ### JSON Output
 ```python
 response = polyllm.generate(
-    model="claude-3-5-sonnet-latest",
+    model="anthropic/claude-3-5-sonnet-latest",
     messages=[{"role": "user", "content": "List three colors in JSON"}],
     json_output=True,
 )
@@ -312,7 +318,7 @@ flight_list_schema = polyllm.structured_output_model_to_schema(FlightList, inden
 
 
 response = polyllm.generate(
-    model="gemini-1.5-pro-latest",
+    model="google/gemini-1.5-pro-latest",
     messages=[
         {
             "role": "user",
@@ -338,7 +344,7 @@ print(response_object.flights[0].destination)
 ```python
 from polyllm.langchain import LCPolyLLM
 
-llm = LCPolyLLM(model="gpt-4")
+llm = LCPolyLLM(model="openai/gpt-4")
 response = llm.invoke("What is your name?")
 print(response)
 

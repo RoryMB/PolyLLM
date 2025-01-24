@@ -1,14 +1,19 @@
 import base64
 import json
+import os
 from typing import Callable
+import warnings
 
 from pydantic import BaseModel
 
 from ..utils import load_image
 
 try:
-    from openai import OpenAI
-    openai_client = OpenAI()
+    if 'GEMINI_API_KEY' not in os.environ and 'GOOGLE_API_KEY' in os.environ:
+        os.environ['GEMINI_API_KEY'] = os.environ['GOOGLE_API_KEY']
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        import litellm
     did_import = True
 except ImportError:
     did_import = False
@@ -16,21 +21,7 @@ except ImportError:
 
 _models = []
 def get_models():
-    lazy_load()
     return _models
-
-lazy_loaded = False
-def lazy_load():
-    global lazy_loaded, _models
-
-    if lazy_loaded:
-        return
-    lazy_loaded = True
-
-    if not did_import:
-        return
-
-    _models = sorted(model.id for model in list(openai_client.models.list()))
 
 def generate(
     model: str,
@@ -45,43 +36,27 @@ def generate(
     kwargs = {
         "model": model,
         "messages": transformed_messages,
-        "stream": stream,
-        "max_tokens": 4096,
         "temperature": temperature,
+        "stream": stream,
     }
 
     if json_output:
+        if "response_format" not in litellm.get_supported_openai_params(model):
+            raise NotImplementedError
         kwargs["response_format"] = {"type": "json_object"}
     if structured_output_model:
-        # Structured Output mode doesn't currently support streaming
-        stream = False
-        kwargs.pop("stream")
-        # TODO: Warn
+        if "response_format" not in litellm.get_supported_openai_params(model):
+            raise NotImplementedError
+        if not litellm.supports_response_schema(model):
+            raise NotImplementedError
         kwargs["response_format"] = structured_output_model
 
-    client = OpenAI()
-    if stream:
-        def stream_generator():
-            response = client.chat.completions.create(**kwargs)
-            for chunk in response:
-                text = chunk.choices[0].delta.content
-                if text:
-                    yield text
-        return stream_generator()
-    else:
-        if structured_output_model:
-            response = client.beta.chat.completions.parse(**kwargs)
-            if (response.choices[0].message.refusal):
-                text = response.choices[0].message.refusal
-            else:
-                # Auto-generated Pydantic object here:
-                #     response.choices[0].message.parsed
-                text = response.choices[0].message.content
-        else:
-            response = client.chat.completions.create(**kwargs)
-            text = response.choices[0].message.content
+    response = litellm.completion(**kwargs)
 
-        return text
+    if stream:
+        return (part.choices[0].delta.content or "" for part in response)
+    else:
+        return response.choices[0].message.content
 
 def generate_tools(
     model: str,
@@ -96,16 +71,15 @@ def generate_tools(
         "model": model,
         "messages": transformed_messages,
         "stream": False,
-        "max_tokens": 4096,
         "temperature": temperature,
     }
 
     if transformed_tools:
+        litellm.supports_function_calling(model="ollama/llama2")
         kwargs["tools"] = transformed_tools
         kwargs["tool_choice"] = "auto"
 
-    client = OpenAI()
-    response = client.chat.completions.create(**kwargs)
+    response = litellm.completion(**kwargs)
 
     text = ''
     if response.choices[0].message.content:

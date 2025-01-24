@@ -162,10 +162,10 @@ def prepare_messages(messages):
     return messages_out
 
 def prepare_tools(tools: list[Callable]):
-    openai_tools = []
+    tools_out = []
 
     for tool in tools:
-        openai_tools.append({
+        tools_out.append({
             "type": "function",
             "function": {
                 "name": tool.__name__,
@@ -173,7 +173,7 @@ def prepare_tools(tools: list[Callable]):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        param: {"type": "number" if annotation == int else "string"}  # noqa: E721
+                        param: {"type": "number" if annotation is int else "string"}
                         for param, annotation in tool.__annotations__.items()
                         if param != 'return'
                     },
@@ -182,4 +182,4 @@ def prepare_tools(tools: list[Callable]):
             }
         })
 
-    return openai_tools
+    return tools_out
