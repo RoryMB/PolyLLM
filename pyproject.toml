@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "polyllm"
-version = "1.0.5"
+version = "1.0.6"
 authors = [
     { name="Rory Butler" },
 ]
 description = "A unified interface for querying multiple large language models"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -19,19 +19,15 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
+    "anthropic",
     "backoff",
-    "pydantic",
-]
-
-[project.optional-dependencies]
-all = [
+    "google-generativeai",
+    "litellm",
     "llama-cpp-python",
     "mlx-lm",
     "ollama",
     "openai",
-    "google-generativeai",
-    "anthropic",
-    "litellm",
+    "pydantic",
 ]
 
 [project.urls]

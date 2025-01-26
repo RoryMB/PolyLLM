@@ -1,10 +1,11 @@
 import base64
+import imghdr
 import json
 from typing import Callable
 
 from pydantic import BaseModel
 
-from ..utils import flatten_schema_dict, extract_last_json, load_image
+from ..utils import extract_last_json, flatten_schema_dict, load_image
 
 try:
     import anthropic
@@ -156,6 +157,16 @@ def generate_tools(
 
     return text, tool, args
 
+def get_image_mime_type(image_bytes):
+    image_type = imghdr.what(None, h=image_bytes)
+    mime_types = {
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp'
+    }
+    return mime_types.get(image_type)
+
 def prepare_messages(messages):
     messages_out = []
 
@@ -179,12 +190,13 @@ def prepare_messages(messages):
                     content.append({'type': 'text', 'text': item['text']})
                 elif item['type'] == 'image':
                     image_data = load_image(item['image'])
+                    media_type = get_image_mime_type(image_data)
                     base64_image = base64.b64encode(image_data).decode('utf-8')
                     content.append({
                         'type': 'image',
                         'source': {
                             'type': 'base64',
-                            'media_type': 'image/jpeg',
+                            'media_type': media_type,
                             'data': base64_image,
                         },
                     })
